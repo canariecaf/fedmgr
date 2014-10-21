@@ -27,6 +27,7 @@ class Reports extends MY_Controller {
     {
         parent::__construct();
         $this->load->library('j_auth');
+         MY_Controller::$menuactive = 'admins';
     }
 
     public function  index(){
@@ -42,6 +43,13 @@ class Reports extends MY_Controller {
         {
             show_error('no perm',403);
         }
+
+        if(function_exists('apc_clear_cache'))
+        {
+           apc_clear_cache();
+
+        }
+        $data['titlepage'] = 'system reporter';
         $data['content_view']= 'smanage/index_view';
         $this->load->view('page',$data);
 
@@ -66,12 +74,12 @@ class Reports extends MY_Controller {
        $compared=Doctrine\ORM\Version::compare($minRequiredVersion);
        if($compared>0)
        {
-          echo '<div class="error">'.lang('rr_doctrinever').': '.$currentVersion.'</div>';
-          echo '<div class="error">'.lang('rr_mimumreqversion').': '.$minRequiredVersion.'</div>';
+          echo '<div class="warning alert-box" data-alert>'.lang('rr_doctrinever').': '.$currentVersion.'</div>';
+          echo '<div class="warning alert-box" data-alert>'.lang('rr_mimumreqversion').': '.$minRequiredVersion.'</div>';
        }
        else
        {
-          echo '<div class="success">'.lang('rr_doctrinever').': '.$currentVersion.' : '.lang('rr_meetsminimumreq').'</div>';
+          echo '<div class="success alert-box" data-alert>'.lang('rr_doctrinever').': '.$currentVersion.' : '.lang('rr_meetsminimumreq').'</div>';
        }
 
     }
@@ -87,16 +95,20 @@ class Reports extends MY_Controller {
        if(!$this->j_auth->isAdministrator()){
            show_error('No perm',403);
        }
+       $proxyDir = null; //to genearate to default proxy dir
+       $proxyFactory = $this->em->getProxyFactory();
+       $metadatas = $this->em->getMetadataFactory()->getAllMetadata();
+       $proxyFactory->generateProxyClasses($metadatas, $proxyDir);
        $validator = new SchemaValidator($this->em);
        $errors = $validator->validateMapping();
        if(count($errors)>0)
        {
-           $result = '<div class="error"><ul>'.recurseTree($errors).'</ul></div>';
+           $result = '<div class="waring alert-box" data-alert><ul>'.recurseTree($errors).'</ul></div>';
 
        }
        else
        {
-           $result = '<div class="success">The mapping files are correct</div>';
+           $result = '<div class="success alert-box" data-alert>The mapping files are correct</div>';
        }
        echo $result;
        
@@ -115,15 +127,16 @@ class Reports extends MY_Controller {
        if(!$this->j_auth->isAdministrator()){
            show_error('Unauthorized request',403);
        }
+
        $validator = new SchemaValidator($this->em);
        $result = $validator->schemaInSyncWithMetadata();
        if($result)
        {
-          echo '<div class="success">'.lang('rr_dbinsync').'</div>';
+          echo '<div class="success alert-box" data-alert>'.lang('rr_dbinsync').'</div>';
        }
        else
        {
-          echo '<div class="error">'.lang('rerror_dbinsync').'</div>';
+          echo '<div class="warning alert-box" data-alert>'.lang('rerror_dbinsync').'</div>';
        }
     }
 
@@ -149,14 +162,19 @@ class Reports extends MY_Controller {
     public function vmigrate()
     {
        if(!$this->input->is_ajax_request()){
-           show_error('Bad request',401);
+           set_status_header(401);
+           echo 'Bad request';
            return;
        }
        if(!$this->j_auth->logged_in()){
-           show_error('Session lost',403);
+           set_status_header(403);
+           echo 'Session lost';
+           return;
        }
        if(!$this->j_auth->isAdministrator()){
-           show_error('No perm',403);
+           set_status_header(403);
+           echo 'No permission';
+           return;
        }
 
        $validator = new SchemaValidator($this->em);
@@ -167,11 +185,11 @@ class Reports extends MY_Controller {
            echo '<h5 class="error">'.lang('rerror_migrate1').'</h5>';
            if(count($errors)>0)
            {
-              echo '<div class="error"><ul>'.recurseTree($errors).'</ul></div>';
+              echo '<div class="warning alert-box" data-alert><ul>'.recurseTree($errors).'</ul></div>';
            }
            if(!$errors2)
            {
-              echo '<div class="error">'.lang('rerror_dbinsync').'</div>';
+              echo '<div class="warning alert-box" data-alert>'.lang('rerror_dbinsync').'</div>';
            }
        }
        else
@@ -186,13 +204,14 @@ class Reports extends MY_Controller {
            }
 
            $this->load->library('migration');
-           if($this->migration->current() === $this->migration->latest())
+           $t = $this->migration->current();
+           if($t === false)
            {
-                echo  '<div class="success">'.lang('rr_sysuptodate').'</div>';
+                echo $this->migration->error_string();
            }
            else
            {
-                echo 'Target version: '.$this->migration->current();
+                echo  '<div class="success alert-box" data-alert>'.lang('rr_sysuptodate').' : '.$t.'</div>';
            }
        }
       

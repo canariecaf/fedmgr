@@ -1,7 +1,6 @@
 <?php
 
-if (!defined('BASEPATH'))
-    exit('No direct script access allowed');
+if (!defined('BASEPATH')) exit('No direct script access allowed');
 /**
  * Jagger
  * 
@@ -19,7 +18,8 @@ if (!defined('BASEPATH'))
  * @subpackage  Libraries
  * @author      Janusz Ulanowski <janusz.ulanowski@heanet.ie>
  */
-class Metadata2import {
+class Metadata2import
+{
 
     private $metadata_in_array;
     private $metadata;
@@ -50,74 +50,51 @@ class Metadata2import {
         $this->other = null;
     }
 
-    private function _report($report)
+    private function genReport($report)
     {
-            if(!(!empty($report) && is_array($report)))
-            {
-               return false;
-            }
-            $this->ci->load->library('email_sender');
-            $body = 'Report'.PHP_EOL;
-
-            foreach($report['body']  as $bb)
-            {
-                $body .= $bb.PHP_EOL;
-            }
-
-
-            $structureChanged = FALSE;
-            if(count($report['provider']['new'])> 0)
-            {
-                $structureChanged = TRUE;
-                $body .='List new providers registered during sync:'.PHP_EOL;
-                foreach($report['provider']['new'] as $a)
-                {
-                    $body .= $a.PHP_EOL;
-                }
-            }
-            if(count($report['provider']['joinfed'])> 0)
+        if (!(!empty($report) && is_array($report)))
+        {
+            return false;
+        }
+        $this->ci->load->library('email_sender');
+        $body = 'Report' . PHP_EOL;
+        foreach ($report['body'] as $bb)
+        {
+            $body .= $bb . PHP_EOL;
+        }
+        $structureChanged = FALSE;
+        $sections = array(
+            'new'=>'List new providers registered during sync',
+            'joinfed'=>'List existing providers added to federation during sync',
+            'del'=>'List providers removed from the system during sync',
+            'leavefed'=>'List providers removed from federation during sync');
+        foreach ($sections as $section=>$sectionTitle)
+        {
+            if (count($report['provider']['' . $section . '']) > 0)
             {
                 $structureChanged = TRUE;
-                $body .='List existing providers added to federation during sync:'.PHP_EOL;
-                foreach($report['provider']['joinfed'] as $a)
+                $body .= $sectionTitle.':'.PHP_EOL;
+                foreach ($report['provider'][''.$section.''] as $a)
                 {
-                    $body .= $a.PHP_EOL;
+                    $body .= $a . PHP_EOL;
                 }
             }
-            if(count($report['provider']['del'])> 0)
-            {
-                $structureChanged = TRUE;
-                $body .='List providers removed from the system during sync:'.PHP_EOL;
-                foreach($report['provider']['del'] as $a)
-                {
-                    $body .= $a.PHP_EOL;
-                }
-            }
-            if(count($report['provider']['leavefed'])> 0)
-            {
-                $structureChanged = TRUE;
-                $body .='List providers removed from federation during sync:'.PHP_EOL;
-                foreach($report['provider']['leavefed'] as $a)
-                {
-                    $body .= $a.PHP_EOL;
-                }
-            }
-            $nbody = '';
-            if(!$structureChanged)
-            {
-                $nbody ='No entities have been added/removed after sync/import'.PHP_EOL;
-            }
-            else
-            {
-                $this->ci->email_sender->addToMailQueue(array('gfedmemberschanged'),null,'Federation sync/import report',$body,array(),false);
-            }
-
+        }
+        $nbody = '';
+        if (!$structureChanged)
+        {
+            $nbody = 'No entities have been added/removed after sync/import' . PHP_EOL;
+        }
+        else
+        {
+            $this->ci->email_sender->addToMailQueue(array('gfedmemberschanged'), null, 'Federation sync/import report', $body, array(), false);
+        }
     }
+
     public function import($metadata, $type, $full, array $defaults, $other = null)
     {
         $tmpProviders = new models\Providers;
         $this->metadata = &$metadata;
-
         $this->full = $full;
         $this->type = $type;
         $this->other = $other;
@@ -126,7 +103,8 @@ class Metadata2import {
         {
             return false;
         }
-        $coclist = $this->em->getRepository("models\Coc")->findAll();
+        $coclist = $this->em->getRepository("models\Coc")->findBy(array('type' => 'entcat'));
+        $regpollist = $this->em->getRepository("models\Coc")->findBy(array('type' => 'regpol'));
         $attrsDefinitions = $this->em->getRepository("models\Attribute")->findAll();
 
         $attributes = array();
@@ -146,11 +124,21 @@ class Metadata2import {
         }
         $coclistconverted = array();
         $coclistarray = array();
+        $regpollistconverted = array();
+        $regpollistarray = array();
+        $regpollistlangarray = array();
 
         foreach ($coclist as $k => $c)
         {
-            $coclistconverted[$c->getId()] = $c;
+            $coclistconverted['' . $c->getId() . ''] = $c;
             $coclistarray['' . $c->getId() . ''] = $c->getUrl();
+            $ncoclistarray['' . $c->getSubtype() . '']['' . $c->getId() . ''] = $c->getUrl();
+        }
+        foreach ($regpollist as $k => $c)
+        {
+            $regpollistconverted['' . $c->getId() . ''] = $c;
+            $regpollistarray['' . $c->getId() . ''] = $c->getUrl();
+            $regpollistlangarray['' . $c->getId() . ''] = $c->getLang();
         }
 
 
@@ -169,28 +157,32 @@ class Metadata2import {
         if (array_key_exists('static', $this->defaults) && $this->defaults['static'] === FALSE)
         {
             $static = false;
-        } else
+        }
+        else
         {
             $static = true;
         }
         if (array_key_exists('local', $this->defaults) && $this->defaults['local'] === true)
         {
             $local = true;
-        } else
+        }
+        else
         {
             $local = false;
         }
         if (array_key_exists('active', $this->defaults) && $this->defaults['active'] === true)
         {
             $active = true;
-        } else
+        }
+        else
         {
             $active = false;
         }
         if (array_key_exists('overwritelocal', $this->defaults) && $this->defaults['overwritelocal'] === TRUE)
         {
             $overwritelocal = true;
-        } else
+        }
+        else
         {
             $overwritelocal = false;
         }
@@ -199,7 +191,8 @@ class Metadata2import {
         if (array_key_exists('removeexternal', $this->defaults) && $this->defaults['removeexternal'] === TRUE)
         {
             $removeexternal = true;
-        } else
+        }
+        else
         {
             $removeexternal = false;
         }
@@ -217,7 +210,8 @@ class Metadata2import {
             if (array_key_exists('email', $this->defaults) && !empty($this->defaults['email']))
             {
                 $mailAddresses[] = $this->defaults['email'];
-            } else
+            }
+            else
             {
                 $a = $this->em->getRepository("models\AclRole")->findOneBy(array('name' => 'Administrator'));
                 $a_members = $a->getMembers();
@@ -260,9 +254,10 @@ class Metadata2import {
                 }
                 // list entities in the source 
                 $membersFromSync = array();
+                $counter = 0;
                 foreach ($this->metadata_in_array as $ent)
                 {
-
+                    $counter++;
                     // START if type matches 
                     if ($ent['type'] === 'BOTH' ||
                             $ent['type'] === $type ||
@@ -274,27 +269,50 @@ class Metadata2import {
                         $existingProvider = $tmpProviders->getOneByEntityId($importedProvider->getEntityId());
                         if (empty($existingProvider))
                         {
-                            
+
                             $membersFromSync[] = $importedProvider->getEntityId();
                             $importedProvider->setStatic($static);
                             $importedProvider->setLocal($local);
                             $importedProvider->setActive($active);
-                            // coc begin
-                            if (array_key_exists('coc', $ent) && !empty($ent['coc']))
+                            // entityCategory begin
+                            foreach ($ent['coc'] as $attrname => $v)
                             {
-                                $y = array_search($ent['coc'], $coclistarray);
-                                if ($y != NULL OR $y != FALSE)
+                                if (isset($ncoclistarray['' . $attrname . '']))
                                 {
-                                    $celement = $coclistconverted['' . $y . ''];
-                                    if (!empty($celement))
+                                    foreach ($v as $kv => $pv)
                                     {
-                                        $importedProvider->setCoc($celement);
+                                        $y = array_search($v, $ncoclistarray['' . $attrname . '']);
+                                        if ($y != NULL && $y != FALSE)
+                                        {
+                                            $celement = $coclistconverted['' . $y . ''];
+                                            if (!empty($celement))
+                                            {
+                                                $importedProvider->setCoc($celement);
+                                            }
+                                        }
                                     }
                                 }
-                            } else
-                            {
-                                $importedProvider->setCoc(NULL);
                             }
+                            foreach ($ent['regpol'] as $k => $v)
+                            {
+                                $y = array_search($v['url'], $regpollistarray);
+
+                                if ($y != NULL && $y != FALSE)
+                                {
+                                    foreach ($regpollistconverted as $p)
+                                    {
+                                        $purl = $p->getUrl();
+                                        $plang = $p->getLang();
+                                        if (strcmp($purl, $v['url']) == 0 && strcasecmp($plang, $v['lang']) == 0)
+                                        {
+                                            $importedProvider->setCoc($p);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // end entityCategory
                             // attr req  start
                             if (isset($ent['details']['reqattrs']))
                             {
@@ -312,7 +330,8 @@ class Metadata2import {
                                             if (isset($r['req']) && strcasecmp($r['req'], 'true') == 0)
                                             {
                                                 $reqattr->setStatus('required');
-                                            } else
+                                            }
+                                            else
                                             {
                                                 $reqattr->setStatus('desired');
                                             }
@@ -321,7 +340,8 @@ class Metadata2import {
                                             $this->em->persist($reqattr);
                                             $attrsset[] = $r['name'];
                                         }
-                                    } else
+                                    }
+                                    else
                                     {
                                         log_message('warning', 'Attr couldnt be set as required becuase doesnt exist in attrs table: ' . $r['name']);
                                     }
@@ -342,25 +362,88 @@ class Metadata2import {
                             $membersFromSync[] = $existingProvider->getEntityId();
                             $isLocal = $existingProvider->getLocal();
                             $isLocked = $existingProvider->getLocked();
-                            $updateAllowed = (($isLocal && $overwritelocal && !$isLocked) OR !$isLocal);
+                            $updateAllowed = (($isLocal && $overwritelocal && !$isLocked) OR ! $isLocal);
                             if ($updateAllowed)
                             {
                                 $existingProvider->overwriteByProvider($importedProvider);
-                                if (array_key_exists('coc', $ent) && empty($ent['coc']))
+                                $currentCocs = $existingProvider->getCoc();
+                                foreach ($currentCocs as $c)
                                 {
-                                    $y = array_search($ent['coc'], $coclistarray);
-                                    if ($y != NULL OR $y != FALSE)
+                                    $cType = $c->getType();
+                                    if ($cType === 'entcat')
                                     {
-                                        $celement = $coclistconverted['' . $y . ''];
-                                        if (!empty($celement))
+                                        $cUrl = $c->getUrl();
+                                        $cSubtype = $c->getSubtype();
+                                        if (!isset($ent['coc']['' . $cSubtype . '']))
                                         {
-                                            $existingProvider->setCoc($celement);
+                                            $existingProvider->removeCoc($c);
+                                        }
+                                        else
+                                        {
+                                            $y = array_search($cUrl, $ent['coc']['' . $cSubtype . '']);
+                                            if ($y === NULL || $y === FALSE)
+                                            {
+                                                $existingProvider->removeCoc($c);
+                                            }
+                                            else
+                                            {
+                                                unset($ent['coc']['' . $cSubtype . '']['' . $y . '']);
+                                            }
                                         }
                                     }
-                                } else
-                                {
-                                    $existingProvider->setCoc(NULL);
+                                    elseif ($cType === 'regpol')
+                                    {
+                                        $cUrl = $c->getUrl();
+                                        $cLang = $c->getLang();
+                                        $cExist = FALSE;
+                                        $cKey = null;
+                                        foreach ($ent['regpol'] as $k => $v)
+                                        {
+                                            if (strcmp($cUrl, $v['url']) == 0 && strcasecmp($cLang, $v['lang']) == 0)
+                                            {
+                                                $cExist = TRUE;
+                                                $cKey = $k;
+                                                break;
+                                            }
+                                        }
+                                        if ($cExist === FALSE)
+                                        {
+                                            $existingProvider->removeCoc($c);
+                                        }
+                                        else
+                                        {
+                                            unset($ent['regpol']['' . $cKey . '']);
+                                        }
+                                    }
                                 }
+                                foreach ($ent['coc'] as $attrname => $v)
+                                {
+                                    if (isset($ncoclistarray['' . $attrname . '']))
+                                    {
+                                        foreach ($v as $k => $p)
+                                        {
+                                            $y = array_search($p, $ncoclistarray['' . $attrname . '']);
+                                            if ($y !== null && $y !== FALSE)
+                                            {
+                                                $existingProvider->setCoc($coclistconverted['' . $y . '']);
+                                            }
+                                        }
+                                    }
+                                }
+                                foreach ($ent['regpol'] as $v)
+                                {
+                                    foreach ($regpollistconverted as $c)
+                                    {
+                                        $cUrl = $c->getUrl();
+                                        $cLang = $c->getLang();
+                                        if (strcmp($cUrl, $v['url']) == 0 && strcasecmp($cLang, $v['lang']) == 0)
+                                        {
+                                            $existingProvider->setCoc($c);
+                                            break;
+                                        }
+                                    }
+                                }
+
                                 $existingProvider->setStatic($static);
                                 $duplicateControl = array();
                                 $requiredAttrs = $existingProvider->getAttributesRequirement();
@@ -371,7 +454,8 @@ class Metadata2import {
                                     {
                                         $requiredAttrs->removeElement($a);
                                         $this->em->remove($a);
-                                    } else
+                                    }
+                                    else
                                     {
                                         $duplicateControl[] = $oid;
                                     }
@@ -390,7 +474,8 @@ class Metadata2import {
                                                 if (isset($v['req']) && strcasecmp($v['req'], 'true') == 0)
                                                 {
                                                     $r->setStatus('required');
-                                                } else
+                                                }
+                                                else
                                                 {
                                                     $r->setStatus('desired');
                                                 }
@@ -419,14 +504,16 @@ class Metadata2import {
                                             if (isset($nr['req']) && strcasecmp($nr['req'], 'true') == 0)
                                             {
                                                 $reqattr->setStatus('required');
-                                            } else
+                                            }
+                                            else
                                             {
                                                 $reqattr->setStatus('desired');
                                             }
                                             $reqattr->setReason('');
                                             $existingProvider->setAttributesRequirement($reqattr);
                                             $this->em->persist($reqattr);
-                                        } else
+                                        }
+                                        else
                                         {
                                             log_message('warning', 'Attr couldnt be set as required becuase doesnt exist in attrs table: ' . $nr['name']);
                                         }
@@ -443,7 +530,7 @@ class Metadata2import {
                             {
                                 if (($isLocal && !$isLocked) || !($isLocal))
                                 {
-                                    
+
                                     $newMembership = new models\FederationMembers;
                                     $newMembership->setProvider($existingProvider);
                                     $newMembership->setFederation($f);
@@ -454,86 +541,89 @@ class Metadata2import {
                             }
                             $this->em->persist($existingProvider);
                         }
+                        if ($counter > 50)
+                        {
+                            $this->em->flush();
+                            $counter = 0;
+                        }
                     } // END if type matches
                 }
-                 
-                $currentMembershipList = array_keys($membershipByEnt);
-            
-                $membersdiff = array_diff($currentMembershipList,$membersFromSync);
-                if(count($membersdiff)> 0)
-                {
-                    log_message('debug',__METHOD__.' found diff in membership, not existing members in external metadata '.serialize($membersdiff));
-                    foreach($membersdiff as $d)
-                    {
-                       $mm2 = $membershipByEnt[''.$d.''];
-                       log_message('debug', __METHOD__.' proceeding removing '.$mm2->getProvider()->getEntityId() . ' from fed:'.$f->getName());
-                       $mm2joinstate = $mm2->getJoinState();
-                       $tmpprov = $mm2->getProvider();
-                       
-                       $isLocal = $mm2->getProvider()->getLocal();
-                       if(!($mm2joinstate == 0 ||  $mm2joinstate == 1))
-                       {
-                          
-                          log_message('debug','proceeding '.$mm2->getProvider()->getEntityId() . ' joinstatus:'.$mm2joinstate);
-                          if(!$isLocal && $removeexternal)
-                          {
-                              $ff = $tmpprov->getFederations();  
-                              $countFeds = $ff->count();
-                              if($countFeds < 2 && $ff->contains($f) )
-                              {
-                                $report['provider']['del'][] = $tmpprov->getEntityId();
-                                $this->em->remove($tmpprov);
-                              }
-                              else
-                              {
-                                 $report['provider']['leavefed'][] = $tmpprov->getEntityId();
-                                 $this->em->remove($mm2);
-                              }
 
-                          }
-                          elseif($mm2joinstate != 2)
-                          {
-                              $this->em->remove($mm2);
-                          } 
-                       } 
-                       elseif($mm2joinstate == 0 && !$isLocal)
-                       {
-                            if($removeexternal)
+                $currentMembershipList = array_keys($membershipByEnt);
+
+                $membersdiff = array_diff($currentMembershipList, $membersFromSync);
+                if (count($membersdiff) > 0)
+                {
+                    log_message('debug', __METHOD__ . ' found diff in membership, not existing members in external metadata ' . serialize($membersdiff));
+                    foreach ($membersdiff as $d)
+                    {
+                        $mm2 = $membershipByEnt['' . $d . ''];
+                        log_message('debug', __METHOD__ . ' proceeding removing ' . $mm2->getProvider()->getEntityId() . ' from fed:' . $f->getName());
+                        $mm2joinstate = $mm2->getJoinState();
+                        $tmpprov = $mm2->getProvider();
+
+                        $isLocal = $mm2->getProvider()->getLocal();
+                        if (!($mm2joinstate == 0 || $mm2joinstate == 1))
+                        {
+
+                            log_message('debug', 'proceeding ' . $mm2->getProvider()->getEntityId() . ' joinstatus:' . $mm2joinstate);
+                            if (!$isLocal && $removeexternal)
+                            {
+                                $ff = $tmpprov->getFederations();
+                                $countFeds = $ff->count();
+                                if ($countFeds < 2 && $ff->contains($f))
+                                {
+                                    $report['provider']['del'][] = $tmpprov->getEntityId();
+                                    $this->em->remove($tmpprov);
+                                }
+                                else
+                                {
+                                    $report['provider']['leavefed'][] = $tmpprov->getEntityId();
+                                    $this->em->remove($mm2);
+                                }
+                            }
+                            elseif ($mm2joinstate != 2)
+                            {
+                                $this->em->remove($mm2);
+                            }
+                        }
+                        elseif ($mm2joinstate == 0 && !$isLocal)
+                        {
+                            if ($removeexternal)
                             {
                                 $countFeds = $mm2->getProvider()->getFederations()->count();
-                                if($countFeds < 2)
+                                if ($countFeds < 2)
                                 {
                                     $this->em->remove($mm2->getProvider());
                                 }
                             }
                             else
                             {
-                               $this->em->remove($mm2);
+                                $this->em->remove($mm2);
                             }
-
-                       }
-
+                        }
                     }
                 }
-               try
-               {
-                 $this->_report($report);
-                 $this->em->flush();
-               }
-               catch(Exception $e)
-               {
-                  log_message('error',__METHOD__.' ' .$e);
-                  return false;
-               }
-                 
+                try
+                {
+                    $this->genReport($report);
+                    $this->em->flush();
+                }
+                catch (Exception $e)
+                {
+                    log_message('error', __METHOD__ . ' ' . $e);
+                    return false;
+                }
             }  // END SYNC
             else
             {
                 \log_message('info', __METHOD__ . ' running as import for ' . $f->getName() . '
                   - new entities will be created and added to federation(s)');
 
+                $counter = 0;
                 foreach ($this->metadata_in_array as $ent)
                 {
+                    $counter++;
                     if ($ent['type'] === 'BOTH' ||
                             $ent['type'] === $type ||
                             $type == 'ALL')
@@ -544,27 +634,42 @@ class Metadata2import {
                         $existingProvider = $tmpProviders->getOneByEntityId($importedProvider->getEntityId());
                         if (empty($existingProvider))
                         {
-                            $importResult[] = lang('provcreated').': '.$importedProvider->getEntityId(); 
+                            $importResult[] = lang('provcreated') . ': ' . $importedProvider->getEntityId();
                             $importedProvider->setStatic($static);
                             $importedProvider->setLocal($local);
                             $importedProvider->setActive($active);
                             // coc begin
-                            if (array_key_exists('coc', $ent) && !empty($ent['coc']))
+
+                            foreach ($ent['coc'] as $attrname => $v)
                             {
-                                $y = array_search($ent['coc'], $coclistarray);
-                                if ($y != NULL OR $y != FALSE)
+                                if (isset($coclistarray['' . $attrname . '']))
                                 {
-                                    $celement = $coclistconverted['' . $y . ''];
-                                    if (!empty($celement))
+                                    $y = array_search($v, $coclistarray['' . $attrname . '']);
+                                    if ($y != NULL && $y != FALSE)
                                     {
-                                        $importedProvider->setCoc($celement);
+                                        $celement = $coclistconverted['' . $y . ''];
+                                        if (!empty($celement))
+                                        {
+                                            $importedProvider->setCoc($celement);
+                                        }
                                     }
                                 }
-                            } else
-                            {
-                                $importedProvider->setCoc(NULL);
                             }
                             // coc end
+                            foreach ($ent['regpol'] as $v)
+                            {
+                                foreach ($regpollistconverted as $c)
+                                {
+                                    $cUrl = $c->getUrl();
+                                    $cLang = $c->getLang();
+                                    if (strcmp($cUrl, $v['url']) == 0 && strcasecmp($cLang, $v['lang']) == 0)
+                                    {
+                                        $importedProvider->setCoc($c);
+                                        break;
+                                    }
+                                }
+                            }
+
                             // attr req  start
                             if (isset($ent['details']['reqattrs']))
                             {
@@ -582,7 +687,8 @@ class Metadata2import {
                                             if (isset($r['req']) && strcasecmp($r['req'], 'true') == 0)
                                             {
                                                 $reqattr->setStatus('required');
-                                            } else
+                                            }
+                                            else
                                             {
                                                 $reqattr->setStatus('desired');
                                             }
@@ -591,7 +697,8 @@ class Metadata2import {
                                             $this->em->persist($reqattr);
                                             $attrsset[] = $r['name'];
                                         }
-                                    } else
+                                    }
+                                    else
                                     {
                                         log_message('warning', 'Attr couldnt be set as required becuase doesnt exist in attrs table: ' . $r['name']);
                                     }
@@ -612,32 +719,99 @@ class Metadata2import {
 
                             $this->em->persist($newmembership);
                             $this->em->persist($importedProvider);
-                        } else
+                        }
+                        else
                         { // for existing entity
                             $importEntity = '';
                             $elocal = $existingProvider->getLocal();
                             $isLocked = $existingProvider->getLocked();
-                            $updateAllowed = (($elocal && $overwritelocal && !$isLocked) OR !$elocal);
+                            $updateAllowed = (($elocal && $overwritelocal && !$isLocked) OR ! $elocal);
                             if ($updateAllowed)
                             {
-                                $importEntity .=  lang('provupdated');
+                                $importEntity .= lang('provupdated');
                                 $existingProvider->overwriteByProvider($importedProvider);
                                 $existingProvider->setLocal($this->defaults['local']);
-                                if (array_key_exists('coc', $ent) && empty($ent['coc']))
+                                $currentCocs = $existingProvider->getCoc();
+                                foreach ($currentCocs as $c)
                                 {
-                                    $y = array_search($ent['coc'], $coclistarray);
-                                    if ($y != NULL OR $y != FALSE)
+                                    $cType = $c->getType();
+                                    if ($cType === 'entcat')
                                     {
-                                        $celement = $coclistconverted['' . $y . ''];
-                                        if (!empty($celement))
+                                        $cUrl = $c->getUrl();
+                                        $cSubtype = $c->getSubtype();
+                                        if (!isset($ent['coc']['' . $cSubtype . '']))
                                         {
-                                            $existingProvider->setCoc($celement);
+                                            $existingProvider->removeCoc($c);
+                                        }
+                                        else
+                                        {
+                                            $y = array_search($cUrl, $ent['coc']['' . $cSubtype . '']);
+                                            if ($y === NULL || $y === FALSE)
+                                            {
+                                                $existingProvider->removeCoc($c);
+                                            }
+                                            else
+                                            {
+                                                unset($ent['coc']['' . $cSubtype . '']['' . $y . '']);
+                                            }
                                         }
                                     }
-                                } else
-                                {
-                                    $existingProvider->setCoc(NULL);
+                                    elseif ($cType === 'regpol')
+                                    {
+                                        $cUrl = $c->getUrl();
+                                        $cLang = $c->getLang();
+                                        $cExist = FALSE;
+                                        $cKey = null;
+                                        foreach ($ent['regpol'] as $k => $v)
+                                        {
+                                            if (strcmp($cUrl, $v['url']) == 0 && strcasecmp($cLang, $v['lang']) == 0)
+                                            {
+                                                $cExist = TRUE;
+                                                $cKey = $k;
+                                                break;
+                                            }
+                                        }
+                                        if ($cExist === FALSE)
+                                        {
+                                            $existingProvider->removeCoc($c);
+                                        }
+                                        else
+                                        {
+                                            unset($ent['regpol']['' . $cKey . '']);
+                                        }
+                                    }
                                 }
+
+                                foreach ($ent['coc'] as $attrname => $v)
+                                {
+                                    if (isset($ncoclistarray['' . $attrname . '']))
+                                    {
+                                        foreach ($v as $k => $p)
+                                        {
+                                            $y = array_search($p, $ncoclistarray['' . $attrname . '']);
+                                            if ($y !== null && $y !== FALSE)
+                                            {
+                                                $existingProvider->setCoc($coclistconverted['' . $y . '']);
+                                            }
+                                        }
+                                    }
+                                }
+                                foreach ($ent['regpol'] as $v)
+                                {
+                                    foreach ($regpollistconverted as $c)
+                                    {
+                                        $cUrl = $c->getUrl();
+                                        $cLang = $c->getLang();
+                                        if (strcmp($cUrl, $v['url']) == 0 && strcasecmp($cLang, $v['lang']) == 0)
+                                        {
+                                            $existingProvider->setCoc($c);
+                                            break;
+                                        }
+                                    }
+                                }
+
+
+
 
                                 $existingProvider->setStatic($static);
                                 /**
@@ -652,7 +826,8 @@ class Metadata2import {
                                     {
                                         $requiredAttrs->removeElement($a);
                                         $this->em->remove($a);
-                                    } else
+                                    }
+                                    else
                                     {
                                         $duplicateControl[] = $oid;
                                     }
@@ -671,7 +846,8 @@ class Metadata2import {
                                                 if (isset($v['req']) && strcasecmp($v['req'], 'true') == 0)
                                                 {
                                                     $r->setStatus('required');
-                                                } else
+                                                }
+                                                else
                                                 {
                                                     $r->setStatus('desired');
                                                 }
@@ -700,14 +876,16 @@ class Metadata2import {
                                             if (isset($nr['req']) && strcasecmp($nr['req'], 'true') == 0)
                                             {
                                                 $reqattr->setStatus('required');
-                                            } else
+                                            }
+                                            else
                                             {
                                                 $reqattr->setStatus('desired');
                                             }
                                             $reqattr->setReason('');
                                             $existingProvider->setAttributesRequirement($reqattr);
                                             $this->em->persist($reqattr);
-                                        } else
+                                        }
+                                        else
                                         {
                                             log_message('warning', 'Attr couldnt be set as required becuase doesnt exist in attrs table: ' . $nr['name']);
                                         }
@@ -727,28 +905,34 @@ class Metadata2import {
                                     $newMembership->setFederation($f);
                                     $newMembership->setJoinState('1');
                                     $this->em->persist($newMembership);
-                                    $importEntity .= ', '.lang('rr_addedtofed'); 
-                                } else
+                                    $importEntity .= ', ' . lang('rr_addedtofed');
+                                }
+                                else
                                 {
                                     $cjoinstate = $settingMebership->getJoinState();
-                                    if($cjoinstate == 2)
+                                    if ($cjoinstate == 2)
                                     {
-                                       $importEntity .= '; '.lang('rr_addedtofed');
+                                        $importEntity .= '; ' . lang('rr_addedtofed');
                                     }
-                                    elseif($cjoinstate == 3)
+                                    elseif ($cjoinstate == 3)
                                     {
-                                        $importEntity .= '; '.lang('rr_convertjoinstate31');
+                                        $importEntity .= '; ' . lang('rr_convertjoinstate31');
                                     }
                                     else
                                     {
-                                        $importEntity .= '; '.lang('rr_joinstatealreadyinfed');
+                                        $importEntity .= '; ' . lang('rr_joinstatealreadyinfed');
                                     }
                                     $settingMebership->setJoinState('1');
                                     $this->em->persist($settingMebership);
                                 }
                             }
-                            $importResult[] = $importEntity .': '.$existingProvider->getEntityId();
+                            $importResult[] = $importEntity . ': ' . $existingProvider->getEntityId();
                         } // end for existing provider
+                    }
+                    if ($counter > 50)
+                    {
+                        $this->em->flush();
+                        $counter = 0;
                     }
                 }
             } // END import 
@@ -756,12 +940,13 @@ class Metadata2import {
         try
         {
             $this->em->flush();
-            if(!empty($importResult))
+            if (!empty($importResult))
             {
-                $this->ci->globalnotices['metadataimportmessage']= $importResult;
+                $this->ci->globalnotices['metadataimportmessage'] = $importResult;
             }
             return true;
-        } catch (Exception $e)
+        }
+        catch (Exception $e)
         {
             \log_message('error', __METHOD__ . ' ' . $e);
             return false;

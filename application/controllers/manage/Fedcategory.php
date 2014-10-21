@@ -31,6 +31,7 @@ class Fedcategory extends MY_Controller {
         $this->load->library('form_element');
         $this->load->library('zacl');
         $this->title = lang('title_fedcategory');
+        MY_Controller::$menuactive = 'fed';
     }
 
     private function _submit_validate($id=null)
@@ -74,6 +75,7 @@ class Fedcategory extends MY_Controller {
         }
         else
         {
+           $data['titlepage'] = lang('newfedcategory');
            $data['content_view'] = 'manage/fedcatnew_view';
            $this->load->view('page',$data);
 
@@ -164,7 +166,7 @@ class Fedcategory extends MY_Controller {
         $data['buttonname'] = $currentCategory->getName();
         $data['fullname'] = $currentCategory->getFullName();
         $data['description'] = $currentCategory->getDescription();
-        $data['isdefault'] = $currentCategory->getIsDefault();
+        $data['isdefault'] = $currentCategory->isDefault();
         $members = $currentCategory->getFederations();
         $federations = $this->em->getRepository("models\Federation")->findAll();
         $mult = array();
@@ -214,14 +216,14 @@ class Fedcategory extends MY_Controller {
         foreach ($cats as $c)
         {
             $default = '';
-            if ($c->getIsDefault())
+            if ($c->isDefault())
             {
                 $default = makeLabel('active', lang('rr_default'), lang('rr_default'));
             }
             $editlink = '';
             if ($isAdmin)
             {
-                $editlink = '<a href="' . $baseurl . 'manage/fedcategory/edit/' . $c->getId() . '">' . $editLinkLang . '</a>';
+                $editlink = '<a href="' . $baseurl . 'manage/fedcategory/edit/' . $c->getId() . '"><i class="fi-pencil"></i></a>';
             }
             $result[] = array(
                 'name' => $c->getName() . ' ' . $editlink . ' ' . $default,
@@ -229,7 +231,7 @@ class Fedcategory extends MY_Controller {
                 'desc' => $c->getDescription(),
             );
         }
-
+        $data['titlepage'] = lang('rrfedcatslist');
         $data['result'] = $result;
         $data['content_view'] = 'manage/fedcategory_view';
         $this->load->view('page', $data);

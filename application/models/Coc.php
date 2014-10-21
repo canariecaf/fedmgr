@@ -23,8 +23,7 @@ use \Doctrine\Common\Collections\ArrayCollection;
 
 /**
  * Coc Model
- *
- * This model for Identity and Service Providers definitions
+ * 
  * 
  * @Entity
  * @HasLifecycleCallbacks
@@ -41,9 +40,21 @@ class Coc {
     protected $id;
 
     /**
-     * @Column(type="string", length=255, nullable=false, unique=true)
+     * @Column(type="string", length=255, nullable=false, unique=false)
      */
     protected $name;
+
+    /**
+     * allowed types: entcat (entity category) 
+     * @Column(type="string", length=7, nullable=true)
+     */
+    protected $type;
+
+    /**
+     * allowed subtypes: for entcat: http://macedir.org/entity-category-support, http://macedir.org/entity-category 
+     * @Column(type="string", length=128, nullable=true)
+     */
+    protected $subtype;
 
     /**
      * @Column(type="string", length=512, nullable=false )
@@ -61,13 +72,19 @@ class Coc {
     protected $is_enabled;
 
     /**
-     * @OneToMany(targetEntity="Provider",mappedBy="coc")
+     * @Column(type="string",length=6,nullable=true)
+     */
+    protected $lang;
+
+    /**
+     * @ManyToMany(targetEntity="Provider",mappedBy="coc")
      */
     protected $provider;
  
     public function __construct()
     {
         $this->is_enabled = FALSE;
+        $this->type = 'entcat';
     }
      
     public function getId()
@@ -79,10 +96,21 @@ class Coc {
     {
         return $this->name;   
     }
+
+    public function getType()
+    {
+       return $this->type;
+    }
+
+    public function getSubtype()
+    {
+       return $this->subtype;
+
+    }
      
     public function getUrl()
     {
-        return $this->url;
+        return trim($this->url);
     }
     public function getAvailable()
     {
@@ -92,20 +120,57 @@ class Coc {
     {
         return $this->cdescription;
     }
+   
+    public function getLang()
+    {
+        return $this->lang;
+    }
+
+    public function getProviders()
+    {
+       return $this->provider;
+    }
     
     public function setName($name)
     {
-        $this->name = $name;
+        $this->name = trim($name);
         return $this;
     }
+
+    /**
+     * allowed types: entcat, regpol
+     */
+    public function setType($type)
+    {
+        $this->type = $type;
+        return $this;
+    }
+
+    public function setSubtype($a)
+    {
+        $this->subtype = $a;
+        return $this;
+    }
+   
     public function setUrl($url)
     {
-        $this->url = $url;
+        $this->url = trim($url);
         return $this;
     }
     public function setDescription($desc)
     {
-        $this->cdescription = $desc;
+        $this->cdescription = trim($desc);
+        return $this;
+    }
+
+    public function setLang($lang)
+    {
+        $this->lang = trim($lang);
+        return $this;
+    }
+    public function setProvider($provider)
+    {
+        $this->getProviders()->add($provider);
         return $this;
     }
     public function setAvailable($a=NULL)
@@ -118,6 +183,17 @@ class Coc {
         {
            $this->is_enabled = FALSE;
         }
+        return $this;
+    }
+    
+    public function setEntityCategory($name,$url,$subtype,$description,$isavailable)
+    {
+        $this->name = trim($name);
+        $this->url = trim($url);
+        $this->subtype = trim($subtype);
+        $this->cdescription = trim($description);
+        $this->is_enabled = $isavailable;
+        $this->type = 'entcat';
         return $this;
     }
 

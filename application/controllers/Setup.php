@@ -65,7 +65,6 @@ class Setup extends MY_Controller {
 
         $f .= form_close();
 
-       // $f .= anchor(current_url() . '/exampleusers', 'Only populate example users');
         $data['content_view'] = 'setup_view';
         $data['f'] = $f;
         $this->load->view('page',$data);
@@ -204,7 +203,7 @@ class Setup extends MY_Controller {
                 $parents[$r['name']] = $res;
             }
             $this->em->persist($res);
-            if($r_name == 'dashboard' or $r_name == 'sp_list' or $r_name == 'idp_list' or $r_name == 'entity')
+            if($r_name == 'dashboard' || $r_name == 'sp_list' || $r_name == 'idp_list' || $r_name == 'entity')
             {
                 $acl = new models\Acl;
                 $acl->setResource($res);

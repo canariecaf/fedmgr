@@ -778,7 +778,7 @@ class Gmap {
                 "height" => ($elevation_height != "" ? $elevation_height : str_replace("px", "", $this->height) / 2),
                 "elevation_dom_id" => $elevation_dom_id
             );
-            if ($add_markers == true) {
+            if ($add_markers === true) {
                 $this->addMarkerByAddress($start_address, $start_address, $start_address);
                 $this->addMarkerByAddress($dest_address, $dest_address, $dest_address);
             }
@@ -1554,7 +1554,7 @@ class Gmap {
      */
     function getHeaderJS() {
         $_headerJS = "";
-        if ($this->mobile == true) {
+        if ($this->mobile === true) {
             $_headerJS .= "
         	   <meta name='viewport' content='initial-scale=1.0, user-scalable=no' />
         	";
@@ -1567,7 +1567,7 @@ class Gmap {
 				google.load('visualization', '1', {packages: ['columnchart']});
 			</script>";
         }
-        $_headerJS .= "<script type='text/javascript' src='https://maps.google.com/maps/api/js?sensor=" . (($this->mobile == true) ? "true" : "false") . "'></script>";
+        $_headerJS .= "<script type='text/javascript' src='https://maps.google.com/maps/api/js?sensor=" . (($this->mobile === true) ? "true" : "false") . "'></script>";
         if ($this->marker_clusterer) {
             $_headerJS .= "<script type='text/javascript' src='" . $this->marker_clusterer_location . "' ></script>";
         }
@@ -1740,29 +1740,6 @@ var map$_key = null;\n\n";
             $_script .= 'function onLoad' . $this->map_id . '() {' . "\n";
         }
 
-        if (!empty($this->browser_alert)) {
-            //TODO:Update with new browser catch - GBrowserIsCompatible is deprecated
-            //$_output .= 'if (GBrowserIsCompatible()) {' . "\n";
-        }
-
-        /*
-         * TODO:Update with local search bar once implemented in V3 api 
-          $strMapOptions = "";
-          if($this->local_search){
-          $_output .= "
-          mapOptions.googleBarOptions= {
-          style : 'new'
-          ".(($this->local_search_ads)?",
-          adsOptions: {
-          client: '".$this->ads_pub_id."',
-          channel: '".$this->ads_channel."',
-          language: 'en'
-          ":"")."
-          };
-          ";
-          $strMapOptions .= ", mapOptions";
-          }
-         */
 
         if ($this->display_map) {
             $_script .= sprintf('var mapObj%s = document.getElementById("%s");', $_key, $this->map_id) . "\n";
@@ -1844,7 +1821,6 @@ google.maps.event.addListener(map'.$_key.',\'click\',function(zdarzenie)
             }
 
             //TODO:add support for Google Earth Overlay once integrated with V3
-            //$_output .= "map.addMapType(G_SATELLITE_3D_MAP);\n";
             // zoom so that all markers are in the viewport
             if ($this->zoom_encompass && (count($this->_markers) > 1 || count($this->_polylines) >= 1 || count($this->_overlays) >= 1)) {
                 // increase bounds by fudge factor to keep
@@ -1935,12 +1911,6 @@ google.maps.event.addListener(map'.$_key.',\'click\',function(zdarzenie)
             $_script .= '}' . "\n";
         }//end if $this->display_map==true
 
-        if (!empty($this->browser_alert)) {
-            //TODO:Update with new browser catch SEE ABOVE
-            // $_output .= '} else {' . "\n";
-            // $_output .= 'alert("' . str_replace('"','\"',$this->browser_alert) . '");' . "\n";
-            // $_output .= '}' . "\n";
-        }
 
         if ($this->onload) {
             $_script .= '}' . "\n";
@@ -1997,7 +1967,7 @@ google.maps.event.addListener(map'.$_key.',\'click\',function(zdarzenie)
             $map_id = $this->map_id;
         }
 
-        if ($pano == false) {
+        if ($pano === false) {
             $_prefix = "map";
         } else {
             $_prefix = "panorama" . $this->street_view_dom_id;
@@ -2006,11 +1976,11 @@ google.maps.event.addListener(map'.$_key.',\'click\',function(zdarzenie)
         foreach ($this->_markers as $_marker) {
             $iw_html = str_replace('"', '\"', str_replace(array("\n", "\r"), "", $_marker['html']));
             $_output .= "var point = new google.maps.LatLng(" . $_marker['lat'] . "," . $_marker['lon'] . ");\n";
-            $_output .= sprintf('%s.push(createMarker(%s%s, point,"%s","%s", %s, %s, "%s", %s ));', (($pano == true) ? $_prefix : "") . "markers" . $map_id, $_prefix, $map_id, str_replace('"', '\"', $_marker['title']), str_replace('/', '\/', $iw_html), (isset($_marker["icon_key"])) ? "icon" . $map_id . "['" . $_marker["icon_key"] . "'].image" : "''", (isset($_marker["icon_key"]) && isset($_marker["shadow_icon"])) ? "icon" . $map_id . "['" . $_marker["icon_key"] . "'].shadow" : "''", (($this->sidebar) ? $this->sidebar_id : ""), ((isset($_marker["openers"]) && count($_marker["openers"]) > 0) ? json_encode($_marker["openers"]) : "''")
+            $_output .= sprintf('%s.push(createMarker(%s%s, point,"%s","%s", %s, %s, "%s", %s ));', (($pano === true) ? $_prefix : "") . "markers" . $map_id, $_prefix, $map_id, str_replace('"', '\"', $_marker['title']), str_replace('/', '\/', $iw_html), (isset($_marker["icon_key"])) ? "icon" . $map_id . "['" . $_marker["icon_key"] . "'].image" : "''", (isset($_marker["icon_key"]) && isset($_marker["shadow_icon"])) ? "icon" . $map_id . "['" . $_marker["icon_key"] . "'].shadow" : "''", (($this->sidebar) ? $this->sidebar_id : ""), ((isset($_marker["openers"]) && count($_marker["openers"]) > 0) ? json_encode($_marker["openers"]) : "''")
                     ) . "\n";
         }
 
-        if ($this->marker_clusterer && $pano == false) {//only do marker clusterer for map, not streetview
+        if ($this->marker_clusterer && $pano === false) {//only do marker clusterer for map, not streetview
             $_output .= "
         	   markerClusterer" . $map_id . " = new MarkerClusterer(" . $_prefix . $map_id . ", markers" . $map_id . ", {
 		          maxZoom: " . $this->marker_clusterer_options["maxZoom"] . ",
@@ -2321,18 +2291,11 @@ google.maps.event.addListener(map'.$_key.',\'click\',function(zdarzenie)
      */
     function getMap() {
         $_output = '<script type="text/javascript" charset="utf-8">' . "\n" . '//<![CDATA[' . "\n";
-        //$_output .= 'if (GBrowserIsCompatible()) {' . "\n";
         if (strlen($this->width) > 0 && strlen($this->height) > 0) {
             $_output .= sprintf('document.write(\'<div id="%s"><\/div>\');', $this->map_id, $this->width, $this->height) . "\n";
         } else {
             $_output .= sprintf('document.write(\'<div id="%s" style="position:relative;"><\/div>\');', $this->map_id) . "\n";
         }
-        //$_output .= '}';
-        //if(!empty($this->js_alert)) {
-        //    $_output .= ' else {' . "\n";
-        //    $_output .= sprintf('document.write(\'%s\');', str_replace('/','\/',$this->js_alert)) . "\n";
-        //    $_output .= '}' . "\n";
-        //}
 
         $_output .= '//]]>' . "\n" . '</script>' . "\n";
 
@@ -2447,7 +2410,7 @@ google.maps.event.addListener(map'.$_key.',\'click\',function(zdarzenie)
     function geoGetCoords($address, $depth = 0) {
         switch ($this->lookup_service) {
             case 'GOOGLE':
-                $_url = sprintf('http://%s/maps/api/geocode/json?sensor=%s&address=%s', $this->lookup_server['GOOGLE'], $this->mobile == true ? "true" : "false", rawurlencode($address));
+                $_url = sprintf('http://%s/maps/api/geocode/json?sensor=%s&address=%s', $this->lookup_server['GOOGLE'], $this->mobile === true ? "true" : "false", rawurlencode($address));
                 $_result = false;
                 if ($_result = $this->fetchURL($_url)) {
                     $_result_parts = json_decode($_result);
@@ -2484,7 +2447,7 @@ google.maps.event.addListener(map'.$_key.',\'click\',function(zdarzenie)
     function geoGetCoordsFull($address, $depth = 0) {
         switch ($this->lookup_service) {
             case 'GOOGLE':
-                $_url = sprintf('http://%s/maps/api/geocode/json?sensor=%s&address=%s', $this->lookup_server['GOOGLE'], $this->mobile == true ? "true" : "false", rawurlencode($address));
+                $_url = sprintf('http://%s/maps/api/geocode/json?sensor=%s&address=%s', $this->lookup_server['GOOGLE'], $this->mobile === true ? "true" : "false", rawurlencode($address));
                 $_result = false;
                 if ($_result = $this->fetchURL($_url)) {
                     return json_decode($_result);

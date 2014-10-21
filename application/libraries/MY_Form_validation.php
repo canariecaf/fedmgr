@@ -30,19 +30,6 @@ class MY_form_validation extends CI_form_validation {
         $this->CI->load->helper('metadata_elements');
     }
 
-    /*
-      function is_unique($attribute_name, $model, array $condition) {
-      $cond = array_keys($condition);
-
-      $ent = $this->em->getRepository("$model")->findOneBy($condition);
-      if (!empty($ent)) {
-      $this->set_message($attribute_name, "The %s : \"" . $condition[$cond[0]] . "\" does already exist in the system.");
-      return FALSE;
-      } else {
-      return TRUE;
-      }
-      }
-     */
 
 
     function str_matches_array( $str, $ar)
@@ -136,6 +123,17 @@ class MY_form_validation extends CI_form_validation {
         $this->set_message('valid_date', "The %s : \"$date\" doesn't exist or invalid format. Valid format: yyyy-mm-dd.");
         return FALSE;
     }
+
+    public function valid_time_hhmm($time)
+    {
+        $e = explode(":",$time);
+        if(count($e) === 2 &&  is_numeric($e['0']) && is_numeric($e['1']) && ($e['0'] < 24 && $e['0']>=0) && ($e['1'] >=0 && $e['1']<60))
+        {
+            return true;
+        }
+        $this->set_message('valid_time_hhmm', "The %s : invalid format. Valid format: HH:mm.");
+        return false;
+    }
   /**
      * Validates a date (yyyy-mm-dd) and check if not future
      * 
@@ -188,6 +186,32 @@ class MY_form_validation extends CI_form_validation {
         }
     }
 
+
+    function federation_updateunique($value,$params)
+    {
+        $p = unserialize($params);
+        if(!isset($p['fedid']))
+        {
+           $this->set_message('federation_updateunique','The %s: '.htmlentities($value).' missing federation id');
+           return false;
+        }
+        $pid = $p['fedid'];
+        $attr = $p['attr'];
+        $fed = $this->em->getRepository("models\Federation")->findOneBy(array($attr => $value));
+        if(empty($fed))
+        {
+           return true;
+        }
+        $fedid = $fed->getId();
+        if((int)$pid === (int) $fedid)
+        {
+           return true;
+        }
+        $this->set_message('federation_updateunique','The %s: '.htmlentities($value).' already exists');
+        return false;
+ 
+
+    }
     function federation_unique($arg, $argtype)
     {
         if($argtype === 'name')
@@ -197,6 +221,10 @@ class MY_form_validation extends CI_form_validation {
         elseif($argtype === 'uri')
         {
            $attr = 'urn';
+        }
+        elseif($argtype ==='sysname')
+        {
+           $attr = 'sysname';
         }
         else
         {
@@ -216,6 +244,19 @@ class MY_form_validation extends CI_form_validation {
         }
 
     }
+ 
+    function attribute_unique($value,$name)
+    {
+        $attr = $this->em->getRepository("models\Attribute")->findOneBy(array(''.$name.''=>$value));
+        if(empty($attr))
+        {
+            return true;
+        }
+        $this->set_message('attribute_unique','%s: already exists in the system');
+        return false;
+ 
+    }
+  
     function fedcategory_unique($name,$id=null)
     {
        $ent = $this->em->getRepository("models\FederationCategory")->findOneBy(array('shortname' => $name));
@@ -250,7 +291,7 @@ class MY_form_validation extends CI_form_validation {
     function valid_contact_type($str)
     {
        $allowed = array('administrative','technical','support','billing','other');
-       if(empty($str) or !in_array($str,$allowed))
+       if(empty($str) || !in_array($str,$allowed))
        {
            $this->set_message('valid_contact_type','Invalid contact type');
            return FALSE;
@@ -260,6 +301,46 @@ class MY_form_validation extends CI_form_validation {
            return TRUE;
        }
     }
+    
+    
+    function ecUrlInsert($url, $attrname)
+    {
+        $e = $this->em->getRepository("models\Coc")->findOneBy(array('url'=>$url,'subtype'=>$attrname,'type'=>'entcat'));
+        if(!empty($e))
+        {
+             $this->set_message('ecUrlInsert', "The %s : (". $attrname." : ".$url.") does already exist in the system.");
+             return  FALSE;
+             
+        }
+        return TRUE;
+    }
+    
+    function ecUrlUpdate($url,$params)
+    {
+        $p = unserialize($params);
+        $e = $this->em->getRepository("models\Coc")->findBy(array('url'=>$url,'subtype'=>$p['subtype'],'type'=>'entcat'));
+        $id = $p['id'];
+        $found = false;
+        foreach($e as $v)
+        {
+            $vId = $v->getId();
+            if($id != $vId)
+            {
+                $found = true;
+                break;
+            }
+        }
+        if($found)
+        {
+            $this->set_message('ecUrlUpdate',"The %s :\"$url\" does already exist for \"$attrname\"");
+            return FALSE;
+                
+                
+        }
+        return TRUE;
+        
+    }
+    
     function cocurl_unique_update($url,$id)
     {
         $e = $this->em->getRepository("models\Coc")->findOneBy(array('url' => $url));
@@ -304,7 +385,7 @@ class MY_form_validation extends CI_form_validation {
             }
             else
             {
-                $this->set_message('cocname_unique', "The %s : \"$name\" does already exist in the system.");
+                $this->set_message('cocname_unique_update', "The %s : \"$name\" does already exist in the system.");
                 return FALSE;
             }
         }
@@ -364,6 +445,27 @@ class MY_form_validation extends CI_form_validation {
             return TRUE;
         }
     }
+    function spage_unique($pcode)
+    {
+        if(strcasecmp($pcode,'new')==0)
+        {
+            $this->set_message('spage_unique', "The %s : \"$pcode\" is not allowed. Please choose different code");
+            return FALSE;
+
+        }
+        $page = $this->em->getRepository("models\Staticpage")->findOneBy(array('pcode' => $pcode));
+        if (!empty($page))
+        {
+            $this->set_message('spage_unique', "The %s : \"$pcode\" does already exist in the system.");
+            return FALSE;
+        }
+        else
+        {
+            return TRUE;
+        }
+
+
+    }
 
     function user_mail_unique($email)
     {
@@ -394,7 +496,7 @@ class MY_form_validation extends CI_form_validation {
     }
     function valid_requirement_attr($req)
     {
-        if($req == 'required' or $req == 'desired')
+        if($req == 'required' || $req == 'desired')
         {
             return TRUE;
         }
@@ -419,6 +521,31 @@ class MY_form_validation extends CI_form_validation {
         }
     }
 
+
+    function verify_cert_nokeysize($cert)
+    {
+        $i = explode("\n", $cert);
+        $c = count($i);
+        if ($c < 2)
+        {
+            $pem = chunk_split($cert, 64, PHP_EOL);
+            $cert = $pem;
+        }
+        $this->CI->load->helper('cert');
+        $ncert = getPEM($cert);
+        $res = openssl_x509_parse($ncert);
+        if(is_array($res))
+        {
+            return TRUE;
+        }
+        else
+        {
+            $this->set_message('verify_cert_nokeysize', "The %s : is not valid x509 cert.");
+            return FALSE;
+        }
+
+
+    }
     function verify_cert($cert)
     {
         $i = explode("\n", $cert);
@@ -492,7 +619,7 @@ class MY_form_validation extends CI_form_validation {
 
 				return FALSE;
 			}
-			elseif ( ! in_array($matches[1], array('http', 'https','ftp','ftps')) OR empty($matches[1]) )
+			elseif ( ! in_array($matches[1], array('http', 'https','ftp','ftps')) || empty($matches[1]) )
 			{
                                $this->set_message('valid_extendedurl', "incorrect protocol  \"%s\" ");
 				return FALSE;
@@ -522,7 +649,7 @@ class MY_form_validation extends CI_form_validation {
 
 				return FALSE;
 			}
-			elseif ( ! in_array($matches[1], array('http', 'https')) OR empty($matches[1]) )
+			elseif ( ! in_array($matches[1], array('http', 'https')) || empty($matches[1]) )
 			{
                                $this->set_message('valid_url', "incorrect protocol  \"%s\" ");
 				return FALSE;
@@ -536,6 +663,59 @@ class MY_form_validation extends CI_form_validation {
 		}
 
 	}
+         public function valid_url_ssl($str)
+        {
+                if (empty($str))
+                {
+                        return FALSE;
+                }
+                elseif (preg_match('/^(?:([^:]*)\:)?\/\/(.+)$/', $str, $matches))
+                {
+                        if (empty($matches[2]))
+                        {
+                                $this->set_message('valid_url_ssl','Invalid URL');
+                                return FALSE;
+                        }
+                        elseif ( ! in_array($matches[1], array('https'), TRUE))
+                        {
+                                $this->set_message('valid_url_ssl','Allowed only https protocol');
+                                return FALSE;
+                        }
+
+                        $str = $matches[2];
+                }
+
+                $str = 'https://'.$str;
+
+                // There's a bug affecting PHP 5.2.13, 5.3.2 that considers the
+                // underscore to be a valid hostname character instead of a dash.
+                // Reference: https://bugs.php.net/bug.php?id=51192
+                if (version_compare(PHP_VERSION, '5.2.13', '==') || version_compare(PHP_VERSION, '5.3.2', '=='))
+                {
+                        sscanf($str, 'https://%[^/]', $host);
+                        $str = substr_replace($str, strtr($host, array('_' => '-', '-' => '_')), 7, strlen($host));
+                }
+                $result = (filter_var($str, FILTER_VALIDATE_URL) !== FALSE);
+                if(!$result)
+                {
+                     $this->set_message('valid_url_ssl','Invalid URL');
+                }
+                return $result;
+        }
+
+    function match_language($str)
+    {
+       $langs = languagesCodes();
+       
+       if(array_key_exists($str,$langs))
+       {
+          return TRUE;
+       }
+       $this->set_message('match_language', ''.lang('wronglangcode').': '.htmlentities($str) );
+       return FALSE;
+
+    }
+
 
      function valid_url_or_empty($str)
      {
@@ -552,7 +732,7 @@ class MY_form_validation extends CI_form_validation {
 
 				return FALSE;
 			}
-			elseif ( ! in_array($matches[1], array('http', 'https')) OR empty($matches[1]) )
+			elseif ( ! in_array($matches[1], array('http', 'https')) || empty($matches[1]) )
 			{
                                $this->set_message('valid_url_or_empty', "incorrect protocol  \"%s\" ");
 				return FALSE;
@@ -576,7 +756,7 @@ class MY_form_validation extends CI_form_validation {
             $count = count($acs_index);
             foreach ($acs_index as $key => $value)
             {
-                if (($key != 'n' && !isset($value)) or $value < 0)
+                if (($key != 'n' && !isset($value)) || $value < 0)
                 {
                     $this->set_message('acs_index_check', "incorrect or no value in one of  \"%s\" " . $key . " " . $value);
                     return false;
@@ -626,6 +806,8 @@ class MY_form_validation extends CI_form_validation {
             return true;
         }
     }
+
+
     function valid_static($usage, $t_metadata_entity)
     {
         $tmp_array=array();
@@ -669,8 +851,6 @@ class MY_form_validation extends CI_form_validation {
          $namespases =  h_metadataNamespaces();
          if(!empty($xmls))
          {
-		//$docxml = new \DomDocument();
-                //$docxml->loadXML($metadata);
                	$docxml = new \DomDocument();
 		$docxml->loadXML($metadata);
 		$xpath = new \DomXPath($docxml);
@@ -683,7 +863,6 @@ class MY_form_validation extends CI_form_validation {
                 if(empty($first_attempt))
                 {
 			$tmp_metadata = $docxml->saveXML();
-                        //log_message('debug',$tmp_metadata);
                         $second_attempt = $this->CI->metadata_validator->validateWithSchema($tmp_metadata);
                         if($second_attempt === TRUE)
                         {
@@ -731,8 +910,6 @@ class MY_form_validation extends CI_form_validation {
                
                 }
          }
-      //  $this->CI->load->library('metadata_validator');
-      //  $result = $this->CI->metadata_validator->validateWithSchema($metadata);
 
         if ($result === FALSE)
         {

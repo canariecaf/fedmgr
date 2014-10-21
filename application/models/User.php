@@ -60,7 +60,7 @@ class User {
     protected $salt;
 
     /**
-     * @Column(type="string", length=255, unique=true, nullable=false)
+     * @Column(type="string", length=255, unique=false, nullable=false)
      */
     protected $email;
 
@@ -182,19 +182,6 @@ class User {
         return $this;
     }
 
-    public function authenticateUser($user, $pass)
-    {
-        $encryted = self::encryptPassword($pass);
-        $founduser = self::findUser($user);
-        if (!$founduser)
-        {
-            return FALSE;
-        }
-        /**
-         * 
-         */
-        print_r($founduser);
-    }
 
     /**
      * Encrypt a Password
@@ -237,6 +224,19 @@ class User {
         {
             $this->getRoles()->add($role);
         }
+
+        return $this;
+    }
+
+    public function unsetRole(AclRole $role)
+    {
+        $already_there = $this->getRoles()->contains($role);
+        if ($already_there)
+        {
+            $this->getRoles()->removeElement($role);    
+        }
+        return $this;
+        
     }
 
     /**
@@ -250,23 +250,6 @@ class User {
         return $this;
     }
 
-    /**
-     * Find a User account by username or email
-     *
-     * @static
-     * @access	public
-     * @param	string	$identifier
-     * @return	User|FALSE
-     */
-    public static function findUser($identifier)
-    {
-        $CI = & get_instance();
-
-        $user = $this->CI->em->createQuery("SELECT u FROM models\User u WHERE u.username = '{$identifier}' OR u.email = '{$identifier}'")
-                ->getResult();
-
-        return $user ? $user[0] : FALSE;
-    }
 
     public function findUserMail($username, $email)
     {
@@ -370,13 +353,12 @@ class User {
     {
         log_message('debug', 'setUserpref');
         $this->userpref = serialize($pref);
-        //      return $this;
     }
 
     public function delEntityFromBookmark($id)
     {
         $pref = $this->getUserpref();
-        if (empty($pref) or !is_array($pref))
+        if (empty($pref) || !is_array($pref))
         {
             $pref = array();
         }
@@ -391,7 +373,7 @@ class User {
     public function delFedFromBookmark($id)
     {
         $pref = $this->getUserpref();
-        if (empty($pref) or !is_array($pref))
+        if (empty($pref) || !is_array($pref))
         {
             $pref = array();
         }
@@ -405,7 +387,7 @@ class User {
     public function setShowHelp($b)
     {
        $pref = $this->getUserpref();
-       if (empty($pref) or !is_array($pref))
+       if (empty($pref) || !is_array($pref))
        {
           $pref = array();
        }
@@ -419,7 +401,7 @@ class User {
     {
         log_message('debug', 'addEntityToBookmark');
         $pref = $this->getUserpref();
-        if (empty($pref) or !is_array($pref))
+        if (empty($pref) || !is_array($pref))
         {
             $pref = array();
         }
@@ -446,7 +428,7 @@ class User {
     {
         log_message('debug', 'addFedToBookmark');
         $pref = $this->getUserpref();
-        if (empty($pref) or !is_array($pref))
+        if (empty($pref) || !is_array($pref))
         {
             $pref = array();
         }
@@ -486,6 +468,16 @@ class User {
     {
         $fullname = $this->givenname . " " . $this->surname;
         return $fullname;
+    }
+
+    public function getGivenname()
+    {
+       return $this->givenname;
+    }
+
+    public function getSurname()
+    {
+        return $this->surname;
     }
 
     public function getEmail()

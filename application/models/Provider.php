@@ -31,13 +31,13 @@ use \Doctrine\Common\Collections\ArrayCollection;
  * @Table(name="provider",indexes={@Index(name="type_idx", columns={"type"}),@Index(name="pname_idx", columns={"name"}),@Index(name="islocal_idx", columns={"is_local"})})
  * @author janusz
  */
-class Provider {
+class Provider
+{
 
     protected $em;
     protected $logo_url;
     protected $ci;
     protected $federations;
-
 
     /**
      * @Id
@@ -112,9 +112,9 @@ class Provider {
     protected $scope;
 
     /**
-     * @Column(type="string", length=255, nullable=true)
+     * @Column(type="string",length=10, nullable=true)
      */
-    protected $homeurl;
+    protected $digest;
 
     /**
      * helpdeskurl is used in metadata, it can be http(s) or mailto
@@ -141,10 +141,14 @@ class Provider {
     protected $lprivacyurl;
 
     /**
-     * @ManyToOne(targetEntity="Coc",inversedBy="provider")
+     * @ManyToMany(targetEntity="Coc",inversedBy="provider", cascade={"persist","detach"})
+     * @JoinTable(name="Provider_Coc",
+     *      joinColumns={@JoinColumn(name="provider_id", referencedColumnName="id")},
+     *      inverseJoinColumns={@JoinColumn(name="coc_id", referencedColumnName="id")}
+     *      )
      */
     protected $coc;
-   
+
     /**
      * @OneToMany(targetEntity="ProviderStatsDef",mappedBy="provider",cascade={"persist","remove"})
      */
@@ -154,7 +158,6 @@ class Provider {
      * @OneToMany(targetEntity="ProviderStatsCollection",mappedBy="provider",cascade={"persist","remove"})
      */
     protected $statistic;
-
 
     /**
      * registrar is used in metadata for registrationAuthority in mdrpi:RegistrationInfo
@@ -170,6 +173,7 @@ class Provider {
 
     /**
      * regpolicy is used in metadata for RegistrationPolicy
+     * DEPRECATED - to be removed in v 2.x
      * @Column(type="text",nullable=true)
      */
     protected $regpolicy;
@@ -249,7 +253,7 @@ class Provider {
     //protected $federations;
 
     /**
-     * @OneToMany(targetEntity="FederationMembers", mappedBy="provider", cascade={"persist", "remove"})
+     * @OneToMany(targetEntity="FederationMembers", mappedBy="provider", cascade={"persist", "remove","detach"})
      */
     protected $membership;
 
@@ -259,14 +263,14 @@ class Provider {
     protected $notifications;
 
     /**
-     * @OneToMany(targetEntity="Contact", mappedBy="provider", cascade={"persist", "remove"})
+     * @OneToMany(targetEntity="Contact", mappedBy="provider", cascade={"all"})
      */
     protected $contacts;
 
     /**
      * it can be member of many federations
      *
-     * @OneToMany(targetEntity="Certificate", mappedBy="provider", cascade={"persist", "remove"})
+     * @OneToMany(targetEntity="Certificate", mappedBy="provider", cascade={"all"})
      */
     protected $certificates;
 
@@ -277,7 +281,7 @@ class Provider {
     protected $owner;
 
     /**
-     * @OneToMany(targetEntity="ServiceLocation", mappedBy="provider", cascade={"persist", "remove"})
+     * @OneToMany(targetEntity="ServiceLocation", mappedBy="provider", cascade={"all"})
      */
     protected $serviceLocations;
 
@@ -287,17 +291,17 @@ class Provider {
     protected $attributeReleaseIDP;
 
     /**
-     * @OneToMany(targetEntity="AttributeRequirement", mappedBy="sp_id",cascade={"persist", "remove"})
+     * @OneToMany(targetEntity="AttributeRequirement", mappedBy="sp_id",cascade={"all"})
      */
     protected $attributeRequirement;
 
     /**
-     * @OneToOne(targetEntity="StaticMetadata", mappedBy="provider",cascade={"persist", "remove"})
+     * @OneToOne(targetEntity="StaticMetadata", mappedBy="provider", fetch="EXTRA_LAZY", cascade={"all"})
      */
     protected $metadata;
 
     /**
-     * @OneToMany(targetEntity="ExtendMetadata", mappedBy="provider",cascade={"persist", "remove"})
+     * @OneToMany(targetEntity="ExtendMetadata", mappedBy="provider",cascade={"all"})
      */
     protected $extend;
 
@@ -311,10 +315,8 @@ class Provider {
      */
     private $updatedAt;
 
-
     public function __construct()
     {
-
         $this->contacts = new \Doctrine\Common\Collections\ArrayCollection();
         $this->certificates = new \Doctrine\Common\Collections\ArrayCollection();
         $this->serviceLocations = new \Doctrine\Common\Collections\ArrayCollection();
@@ -324,16 +326,16 @@ class Provider {
         $this->federations = new \Doctrine\Common\Collections\ArrayCollection();
         $this->extend = new \Doctrine\Common\Collections\ArrayCollection();
         $this->attributeRequirement = new \Doctrine\Common\Collections\ArrayCollection();
-        $this->updatedAt = new \DateTime("now",new \DateTimeZone('UTC'));
+        $this->coc = new \Doctrine\Common\Collections\ArrayCollection();
+        $this->updatedAt = new \DateTime("now", new \DateTimeZone('UTC'));
         $this->is_approved = TRUE;
         $this->hidepublic = FALSE;
         $this->is_locked = FALSE;
-
         $this->ci = & get_instance();
         $this->em = $this->ci->doctrine->em;
     }
 
-    public function diffProviderToArray($provider)
+    public function diffProviderToArray(Provider $provider)
     {
         $differ = array();
         if ($provider->getName() != $this->getName())
@@ -345,11 +347,6 @@ class Provider {
         {
             $differ['Displayname']['before'] = $provider->getDisplayName();
             $differ['Displayname']['after'] = $this->getDisplayName();
-        }
-        if ($provider->getHomeUrl() != $this->getHomeUrl())
-        {
-            $differ['Home URL']['before'] = $provider->getHomeUrl();
-            $differ['Home URL']['after'] = $this->getHomeUrl();
         }
         if ($provider->getHelpdeskUrl() != $this->getHelpdeskUrl())
         {
@@ -396,8 +393,8 @@ class Provider {
         }
         if (serialize($provider->getScope('idpsso')) != serialize($this->getScope('idpsso')))
         {
-            $differ['Scope']['before'] = implode(',',$provider->getScope('idpsso'));
-            $differ['Scope']['after'] = implode(',',$this->getScope('idpsso'));
+            $differ['Scope']['before'] = implode(',', $provider->getScope('idpsso'));
+            $differ['Scope']['after'] = implode(',', $this->getScope('idpsso'));
         }
         $nameids_before = $provider->getNameIdToArray();
         $nameids_after = $this->getNameIdToArray();
@@ -461,7 +458,6 @@ class Provider {
         {
             $differ['ValidFrom']['before'] = $validfrom_before;
             $differ['ValidFrom']['after'] = $validfrom_after;
-            ;
         }
         if ($provider->getType() != $this->getType())
         {
@@ -486,7 +482,7 @@ class Provider {
 
         $ldisplayname_diff1 = array_diff_assoc($ldisplayname_before, $ldisplayname_after);
         $ldisplayname_diff2 = array_diff_assoc($ldisplayname_after, $ldisplayname_before);
-        if (count($ldisplayname_diff1) > 0 or count($ldisplayname_diff2) > 0)
+        if (count($ldisplayname_diff1) > 0 || count($ldisplayname_diff2) > 0)
         {
             $tmpstr = '';
             foreach ($ldisplayname_diff1 as $k => $v)
@@ -520,7 +516,7 @@ class Provider {
         }
         $lname_diff1 = array_diff_assoc($lname_before, $lname_after);
         $lname_diff2 = array_diff_assoc($lname_after, $lname_before);
-        if (count($lname_diff1) > 0 or count($lname_diff2) > 0)
+        if (count($lname_diff1) > 0 || count($lname_diff2) > 0)
         {
             $tmpstr = '';
             foreach ($lname_diff1 as $k => $v)
@@ -551,7 +547,7 @@ class Provider {
         }
         $lname_diff1 = array_diff_assoc($lname_before, $lname_after);
         $lname_diff2 = array_diff_assoc($lname_after, $lname_before);
-        if (count($lname_diff1) > 0 or count($lname_diff2) > 0)
+        if (count($lname_diff1) > 0 || count($lname_diff2) > 0)
         {
             $tmpstr = '';
             foreach ($lname_diff1 as $k => $v)
@@ -580,7 +576,7 @@ class Provider {
         }
         $lname_diff1 = array_diff_assoc($lname_before, $lname_after);
         $lname_diff2 = array_diff_assoc($lname_after, $lname_before);
-        if (count($lname_diff1) > 0 or count($lname_diff2) > 0)
+        if (count($lname_diff1) > 0 || count($lname_diff2) > 0)
         {
             $tmpstr = '';
             foreach ($lname_diff1 as $k => $v)
@@ -609,10 +605,10 @@ class Provider {
      */
     public function created()
     {
-        $this->createdAt = new \DateTime("now",new \DateTimeZone('UTC'));
-        if(!isset($this->hidepublic))
+        $this->createdAt = new \DateTime("now", new \DateTimeZone('UTC'));
+        if (!isset($this->hidepublic))
         {
-           $this->hidepublic = false;
+            $this->hidepublic = false;
         }
         if (empty($this->nameidformat))
         {
@@ -698,8 +694,8 @@ class Provider {
      */
     public function updated()
     {
-        \log_message('debug', 'GG update providers updated time for:'.$this->entityid);
-        $this->updatedAt = new \DateTime("now",new \DateTimeZone('UTC'));
+        \log_message('debug', 'GG update providers updated time for:' . $this->entityid);
+        $this->updatedAt = new \DateTime("now", new \DateTimeZone('UTC'));
     }
 
     /**
@@ -707,9 +703,8 @@ class Provider {
      */
     public function setAddionals()
     {
-       $this->ci = & get_instance();
-       $this->em = $this->ci->doctrine->em;
-       
+        $this->ci = & get_instance();
+        $this->em = $this->ci->doctrine->em;
     }
 
     /**
@@ -718,9 +713,9 @@ class Provider {
     public function createEmptyFedColl()
     {
         $this->federations = new \Doctrine\Common\Collections\ArrayCollection();
-    }  
+    }
 
-    public function setName($name)
+    public function setName($name = null)
     {
         $this->name = $name;
         return $this;
@@ -730,12 +725,12 @@ class Provider {
     {
         if (!empty($name))
         {
-            foreach($name as $k => $v)
+            foreach ($name as $k => $v)
             {
-              if(empty($v))
-              {
-                 unset($name[''.$k.'']);
-              }
+                if (empty($v))
+                {
+                    unset($name['' . $k . '']);
+                }
             }
             $this->lname = serialize($name);
         }
@@ -745,22 +740,9 @@ class Provider {
         }
     }
 
-    public function setDisplayName($name)
+    public function setDisplayName($name = null)
     {
         $this->displayname = $name;
-        return $this;
-    }
-
-    public function setCoc($coc = NULL)
-    {
-        if (empty($coc))
-        {
-            $this->coc = NULL;
-        }
-        else
-        {
-            $this->coc = $coc;
-        }
         return $this;
     }
 
@@ -768,77 +750,101 @@ class Provider {
     {
         if (!empty($name) && is_array($name))
         {
-            foreach($name as $k => $v)
+            foreach ($name as $k => $v)
             {
-               if(empty($v))
-               {
-                   unset($name[''.$k.'']);
-               }
+                if (empty($v))
+                {
+                    unset($name['' . $k . '']);
+                }
             }
             $this->ldisplayname = serialize($name);
         }
         else
         {
-            $this->ldisplayname = serialize(array()); 
+            $this->ldisplayname = serialize(array());
         }
     }
+
     public function setRegistrationPolicyFromArray($regarray, $reset = FALSE)
     {
-         
-         if($reset === TRUE)
-         {
-             $this->regpolicy = serialize($regarray);
-         }
-         else
-         {
-             $s = $this->getRegistrationPolicy();
-             $n = array_merge($s,$regarray);
-             $this->regpolicy = serialize($n);
-    
-         }
-         return $this; 
 
+        if ($reset === TRUE)
+        {
+            $this->regpolicy = serialize($regarray);
+        }
+        else
+        {
+            $s = $this->getRegistrationPolicy();
+            $n = array_merge($s, $regarray);
+            $this->regpolicy = serialize($n);
+        }
+        return $this;
     }
+
     public function setRegistrationPolicy($lang, $url)
     {
         $s = $this->getRegistrationPolicy();
-        $s[''.$lang.''] = $url;
+        $s['' . $lang . ''] = $url;
         $this->regpolicy = serialize($s);
         return $this;
     }
+
     public function resetRegistrationPolicy()
     {
-         $this->regpolicy = serialize(array());
-         return $this;
-    }
-    /**
-    public function setScope($scope)
-    {
-        $this->scope = $scope;
+        $this->regpolicy = serialize(array());
         return $this;
     }
-    */
+
+    /**
+      public function setScope($scope)
+      {
+      $this->scope = $scope;
+      return $this;
+      }
+     */
+
     /**
      * type : idpsso, aa
      * $scope: array();
      */
-    public function setScope($type,$scope)
+    public function setScope($type, $scope)
     {
         $ex = @unserialize($this->scope);
-        if($ex === 'b:0;' || $ex !== false)
+        if ($ex === 'b:0;' || $ex !== false)
         {
-            $ex[''.$type.''] = $scope;
+            $ex['' . $type . ''] = $scope;
         }
         else
         {
             $ex = array();
-            $ex[''.$type.''] = $scope;
+            $ex['' . $type . ''] = $scope;
         }
         $this->scope = serialize($ex);
         return $this;
     }
 
-    public function overwriteScope($n, $provider)
+    private function overwriteScopeFull(Provider $provider)
+    {
+        $pScope = $provider->getScopeFull();
+        if (!isset($pScope['idpsso']))
+        {
+            $pScope['idpsso'] = array();
+        }
+        if (!isset($pScope['aa']))
+        {
+            $pScope['aa'] = array();
+        }
+        foreach ($pScope as $k => $v)
+        {
+            if ($k === 'idpsso' || $k === 'aa')
+            {
+                $this->setScope($k, $v);
+            }
+        }
+        return $this;
+    }
+
+    public function overwriteScope($n, Provider $provider)
     {
         $this->setScope($n, $provider->getScope($n));
         return $this;
@@ -856,6 +862,12 @@ class Provider {
         {
             return false;
         }
+    }
+
+    public function setDigest($a = null)
+    {
+        $this->digest = $a;
+        return $this;
     }
 
     public function setCountry($country = null)
@@ -884,7 +896,6 @@ class Provider {
         {
             $nameid = "urn:oasis:names:tc:SAML:2.0:nameid-format:transient";
         }
-        //$this->nameidformat = $nameid;
         if (empty($this->nameidformat))
         {
             $this->nameidformat = new \Doctrine\Common\Collections\ArrayCollection();
@@ -904,32 +915,34 @@ class Provider {
         return $this;
     }
 
-
     public function setVisiblePublic()
     {
-         $this->hidepublic = false;
-         return $this;
+        $this->hidepublic = false;
+        return $this;
     }
 
     public function getMembership()
     {
-         return $this->membership;
+        return $this->membership;
     }
 
-    public function addMembership($membership)
+    public function addMembership(FederationMembers $membership)
     {
-        if (!$this->membership->contains($membership)) {
+        if (!$this->membership->contains($membership))
+        {
             $this->membership->add($membership);
             $membership->setProvider($this);
         }
- 
+
         return $this;
     }
+
     public function setHidePublic()
     {
-         $this->hidepublic = true;
-         return $this;
+        $this->hidepublic = true;
+        return $this;
     }
+
     public function resetProtocol()
     {
         $this->protocol = new \Doctrine\Common\Collections\ArrayCollection();
@@ -946,7 +959,6 @@ class Provider {
         {
             $this->protocol = new \Doctrine\Common\Collections\ArrayCollection();
         }
-        //$this->getProtocol()->add($protocol);
         $this->protocol->add($protocol);
         return $this;
     }
@@ -956,12 +968,12 @@ class Provider {
         $allowed = array('aa', 'idpsso', 'spsso');
         if (in_array($n, $allowed) && is_array($data))
         {
-            foreach($data as $k=>$v)
+            foreach ($data as $k => $v)
             {
                 $i = trim($v);
-                if(empty($i))
+                if (empty($i))
                 {
-                   unset($data[''.$k.'']);
+                    unset($data['' . $k . '']);
                 }
             }
             $r = $this->getProtocolSupport();
@@ -1013,7 +1025,7 @@ class Provider {
         return $this;
     }
 
-    public function setHelpdeskUrl($url)
+    public function setHelpdeskUrl($url = null)
     {
         $this->helpdeskurl = $url;
         return $this;
@@ -1023,12 +1035,12 @@ class Provider {
     {
         if (!empty($urls) && is_array($urls))
         {
-            foreach($urls as $k=>$v)
+            foreach ($urls as $k => $v)
             {
-               if(empty($v))
-               {
-                  unset($urls[''.$k.'']);
-               }
+                if (empty($v))
+                {
+                    unset($urls['' . $k . '']);
+                }
             }
             $this->lhelpdeskurl = serialize($urls);
         }
@@ -1036,15 +1048,6 @@ class Provider {
         {
             $this->lhelpdeskurl = NULL;
         }
-    }
-
-    /**
-     * set homeurl
-     */
-    public function setHomeUrl($url)
-    {
-        $this->homeurl = $url;
-        return $this;
     }
 
     public function setPrivacyUrl($url = null)
@@ -1070,15 +1073,15 @@ class Provider {
         return $this;
     }
 
-    public function setRegistrationDate($date = null)
+    public function setRegistrationDate(\DateTime $date = null)
     {
-        if(empty($date))
+        if (empty($date))
         {
-           $this->registerdate = NULL;
+            $this->registerdate = NULL;
         }
         else
         {
-           $this->registerdate = $date->setTimezone(new \DateTimeZone('UTC'));
+            $this->registerdate = $date->setTimezone(new \DateTimeZone('UTC'));
         }
         return $this;
     }
@@ -1086,7 +1089,7 @@ class Provider {
     /**
      * set time entity is valid to, if null then current time
      */
-    public function setValidTo($date = NULL)
+    public function setValidTo(\DateTime $date = NULL)
     {
         if (empty($date))
         {
@@ -1094,13 +1097,12 @@ class Provider {
         }
         else
         {
-            // $date->setTime(23, 59, 59);
             $this->validto = $date->setTimezone(new \DateTimeZone('UTC'));
         }
         return $this;
     }
 
-    public function setValidFrom($date = NULL)
+    public function setValidFrom(\DateTime $date = NULL)
     {
         if (empty($date))
         {
@@ -1108,7 +1110,6 @@ class Provider {
         }
         else
         {
-            //$date->setTime(00, 01, 00);
             $this->validfrom = $date->setTimezone(new \DateTimeZone('UTC'));
         }
         return $this;
@@ -1119,7 +1120,6 @@ class Provider {
         $this->description = $description;
         return $this;
     }
-
 
     /**
      * updateLocalizedMdui1 for elements: Description, DisplayName, PrivacyURL, InformationURL
@@ -1146,9 +1146,11 @@ class Provider {
         }
         foreach ($ex as $e)
         {
-            if ($e->getElement() === $elementName && $e->getType() === $type && $e->getNameSpace() === 'mdui')
+            $origElementName = $e->getElement();
+            $origType = $e->getType();
+            $origNameSpace = $e->getNameSpace();
+            if ($origElementName === $elementName && $origType === $type && $origNameSpace === 'mdui')
             {
-                $value = $e->getElementValue();
                 $t = $e->getAttributes();
                 $lvalue = $t['xml:lang'];
                 if (array_key_exists($lvalue, $descriptions))
@@ -1303,12 +1305,12 @@ class Provider {
 
     public function setFederation(Federation $federation)
     {
-        $doFilter['federation_id'] = array(''.$federation->getId().'');
+        $doFilter['federation_id'] = array('' . $federation->getId() . '');
         $membership = $this->getMembership()->filter(
-          function($entry) use($doFilter){
-             return (in_array($entry->getFederation()->getId(),$doFilter['federation_id']));
-          }
-       );
+                function(FederationMembers $entry) use($doFilter) {
+            return (in_array($entry->getFederation()->getId(), $doFilter['federation_id']));
+        }
+        );
 
 
         if ($membership->count() == 0)
@@ -1323,30 +1325,28 @@ class Provider {
     public function removeFederation(Federation $federation)
     {
 
-        $doFilter['federation_id'] = array(''.$federation->getId().'');
+        $doFilter['federation_id'] = array('' . $federation->getId() . '');
         $membership = $this->getMembership()->filter(
-          function($entry) use($doFilter){
-             return (in_array($entry->getFederation()->getId(),$doFilter['federation_id']));
-          }
-       );
+                function(FederationMembers $entry) use($doFilter) {
+            return (in_array($entry->getFederation()->getId(), $doFilter['federation_id']));
+        }
+        );
 
 
-        foreach($membership as $m)
+        foreach ($membership as $m)
         {
             $this->removeMembership($m);
         }
         return $this->getFederations();
-
-
-
     }
 
     public function removeMembership(FederationMembers $membership)
     {
-        if ($this->membership->contains($membership)) {
+        if ($this->membership->contains($membership))
+        {
             $this->membership->removeElement($membership);
         }
- 
+
         return $this;
     }
 
@@ -1371,6 +1371,20 @@ class Provider {
         $this->getServiceLocations()->removeElement($service);
         $this->em->remove($service);
         return $this->serviceLocations;
+    }
+
+    public function removeCoc(Coc $coc)
+    {
+        $this->getCoc()->removeElement($coc);
+        $coc->getProviders()->removeElement($this);
+        return $this;
+    }
+
+    public function setCoc(Coc $coc)
+    {
+        $this->getCoc()->add($coc);
+        $coc->getProviders()->add($this);
+        return $this;
     }
 
     public function setStatic($static)
@@ -1469,42 +1483,24 @@ class Provider {
      */
     public function overwriteByProvider(Provider $provider)
     {
-        $this->ci = & get_instance();
-        $this->em = $this->ci->doctrine->em;
-
-
-
         $this->setName($provider->getName());
         $this->setLocalName($provider->getLocalName());
         $this->setDisplayName($provider->getDisplayName());
         $this->setLocalDisplayName($provider->getLocalDisplayName());
-        $this->setScope('idpsso',$provider->getScope('idpsso'));
-        $this->setScope('aa',$provider->getScope('aa'));
+        $this->overwriteScopeFull($provider);
         $this->setEntityId($provider->getEntityId());
         $this->setRegistrationAuthority($provider->getRegistrationAuthority());
-        //$regdate = $provider->getRegistrationDate();
         $this->setRegistrationDate($provider->getRegistrationDate());
-        $this->setRegistrationPolicyFromArray($provider->getRegistrationPolicy(), TRUE);
-
         $this->overwriteWithNameid($provider);
-        log_message('debug','GG :'.serialize($this->getNameIds())); 
-
-        $prototypes = array('idpsso','aa','spsso');
-        foreach($prototypes as $a)
+        $prototypes = array('idpsso', 'aa', 'spsso');
+        foreach ($prototypes as $a)
         {
             $this->setProtocolSupport($a, $provider->getProtocolSupport($a));
         }
         $this->setType($provider->getType());
         $this->setHelpdeskUrl($provider->getHelpdeskUrl());
-        $homeurl = $provider->getHomeUrl();
-        if (empty($homeurl))
-        {
-            $homeurl = $provider->getHelpdeskUrl();
-        }
-        $this->setHomeUrl($homeurl);
         $this->setValidFrom($provider->getValidFrom());
         $this->setValidTo($provider->getValidTo());
-        $this->setDescription($provider->getDescription());
         $smetadata = $provider->getStaticMetadata();
         if (!empty($smetadata))
         {
@@ -1530,6 +1526,15 @@ class Provider {
         {
             $this->setCertificate($r);
         }
+
+        foreach ($this->getContacts() as $cn)
+        {
+            $this->removeContact($cn);
+        }
+        foreach ($provider->getContacts() as $cn2)
+        {
+            $this->setContact($cn2);
+        }
         foreach ($this->getExtendMetadata() as $f)
         {
             if (!empty($f))
@@ -1544,7 +1549,7 @@ class Provider {
         return $this;
     }
 
-    private function removeExtendWithChildren($e)
+    private function removeExtendWithChildren(ExtendMetadata $e)
     {
         $this->ci = & get_instance();
         $this->em = $this->ci->doctrine->em;
@@ -1645,15 +1650,15 @@ class Provider {
     {
         return $this->notifications;
     }
+
     public function addNotification(NotificationList $notification)
     {
         $isin = $this->getNotifications()->contains($notification);
-        if(empty($isin))
+        if (empty($isin))
         {
-          $this->getNotifications()->add($notification);
+            $this->getNotifications()->add($notification);
         }
         return $this;
-
     }
 
     public function getActive()
@@ -1710,16 +1715,17 @@ class Provider {
     public function getRegistrationPolicy()
     {
         $s = @unserialize($this->regpolicy);
-        if(empty($s))
+        if (empty($s))
         {
-           return array();
+            return array();
         }
         return $s;
     }
+
     public function getScope($n)
     {
         $s = @unserialize($this->scope);
-        if(isset($s[$n]))
+        if (isset($s[$n]))
         {
             return $s[$n];
         }
@@ -1728,25 +1734,38 @@ class Provider {
             return array();
         }
     }
+
+    public function getScopeFull()
+    {
+        $s = @unserialize($this->scope);
+        if (!empty($s))
+        {
+            return $s;
+        }
+        else
+        {
+            return array('aa' => array(), 'idpsso' => array());
+        }
+    }
+
     /**
      * used for convert strings to array
      */
     public function convertScope()
     {
         $s = $this->scope;
-        if(!empty($s))
+        if (!empty($s))
         {
-           $s2 = @unserialize($s);
-           if(empty($s2))
-           {
-              $y = explode(',',$this->scope);
-              $z = array('idpsso'=>$y,'aa'=>$y);
-              $this->scope=(serialize($z));
-              return $this;
-           }
+            $s2 = @unserialize($s);
+            if (empty($s2))
+            {
+                $y = explode(',', $this->scope);
+                $z = array('idpsso' => $y, 'aa' => $y);
+                $this->scope = (serialize($z));
+                return $this;
+            }
         }
     }
-
 
     public function getAttributeReleasePolicies()
     {
@@ -1763,45 +1782,35 @@ class Provider {
         return $this->attributeRequirement;
     }
 
-    public function getAttributesRequirementToArray_V1()
-    {
-        $result = array();
-        $req = $this->getAttributesRequirement();
-        foreach ($req as $r)
-        {
-            $result[$r->getAttribute()->getName()] = $r->getStatus();
-        }
-        return $result;
-    }
-
     public function getFederations()
     {
         $mem = $this->membership;
         $federations = new \Doctrine\Common\Collections\ArrayCollection();
-        foreach($mem as $m)
+        foreach ($mem as $m)
         {
-          $joinstate = $m->getJoinState();
-          if($joinstate != 2)
-          {
-             $federations->add($m->getFederation());;
-          }
+            $joinstate = $m->getJoinState();
+            if ($joinstate != 2)
+            {
+                $federations->add($m->getFederation());
+                ;
+            }
         }
         return $federations;
-
     }
+
     public function getActiveFederations()
     {
         $mem = $this->membership;
         $federations = new \Doctrine\Common\Collections\ArrayCollection();
-        foreach($mem as $m)
+        foreach ($mem as $m)
         {
-          if($m->getIsFinalMembership())
-          {
-             $federations->add($m->getFederation());;
-          }
+            if ($m->isFinalMembership())
+            {
+                $federations->add($m->getFederation());
+                ;
+            }
         }
         return $federations;
-
     }
 
     public function getFederationNames()
@@ -1809,9 +1818,9 @@ class Provider {
         $feders = array();
         foreach ($this->membership as $entry)
         {
-            $feder[] = $entry->getFederation();
+            $feders[] = $entry->getFederation();
         }
-        return $feder;
+        return $feders;
     }
 
     public function getName()
@@ -1832,60 +1841,66 @@ class Provider {
         }
     }
 
-    public function getNameToWebInLang($lang,$type=null)
+    public function getMergedLocalName()
+    {
+        $r = $this->getLocalName();
+        if (!isset($r['en']) && !empty($this->name))
+        {
+            $r['en'] = $this->name;
+        }
+        return $r;
+    }
+
+    public function getNameToWebInLang($lang, $type = null)
     {
         $result = null;
         $backupname = null;
-        if(empty($type))
+        if (empty($type))
         {
             $type = $this->type;
         }
-        $e  = $this->getExtendMetadata();
-        if(!empty($e))
+        $e = $this->getExtendMetadata();
+        if (!empty($e))
         {
-           foreach($e as $p)
-           {
-              $k = $p->getElement();
-              $t = $p->getType();
-              if(strcmp($k,'DisplayName') == 0 && strcasecmp($t,$type) == 0)
-              {
-                  $n = $p->getNameSpace(); 
-                  $a = $p->getAttributes();
-                  if(isset($a['xml:lang']))
-                  {
-                     if(strcasecmp($a['xml:lang'],$lang) == 0)
-                     {
+            foreach ($e as $p)
+            {
+                $k = $p->getElement();
+                $t = $p->getType();
+                $a = $p->getAttributes();
+                if (strcmp($k, 'DisplayName') == 0 && strcasecmp($t, $type) == 0 && isset($a['xml:lang']))
+                {
+                    if (strcasecmp($a['xml:lang'], $lang) == 0)
+                    {
                         $result = $p->getEvalue();
                         break;
-                     }
-                     elseif($backupname === null)
-                     {
-                         $backupname = $p->getEvalue();
-                     }
-                  }
-              }
-          }
-        }
-        if($result === null)
-        {
-           if($backupname !== null)
-           {
-              $result = $backupname;
-           }
-           else
-           {
-                $result = $this->getDisplayNameInLang($lang);
-                if(empty($result))
-                {
-                   $result = $this->getNameInLang($lang);
+                    }
+                    elseif ($backupname === null)
+                    {
+                        $backupname = $p->getEvalue();
+                    }
                 }
-           }
+            }
         }
-        
-      
-
-        return $result;
-
+        if ($result === null)
+        {
+            if ($backupname !== null)
+            {
+                $result = $backupname;
+            }
+            else
+            {
+                $result = $this->getDisplayNameInLang($lang);
+                if (empty($result))
+                {
+                    $result = $this->getNameInLang($lang);
+                }
+            }
+        }
+        if (empty($result))
+        {
+            $result = $this->entityid;
+        }
+        return trim($result);
     }
 
     public function getNameLocalized()
@@ -1908,36 +1923,33 @@ class Provider {
 
     public function getDisplayNameInLang($lang)
     {
-       $r = $this->getDisplayNameLocalized();
-       if(isset($r[''.$lang.'']))
-       {
-          return $r[''.$lang.''];
-       }
-       else
-       {
-          return $r['en'] ;
-       }
-    
+        $r = $this->getDisplayNameLocalized();
+        if (isset($r['' . $lang . '']))
+        {
+            return $r['' . $lang . ''];
+        }
+        else
+        {
+            return $r['en'];
+        }
     }
 
     public function getNameInLang($lang)
     {
-       $r = $this->getNameLocalized();
-       if(isset($r[''.$lang.'']))
-       {
-          return $r[''.$lang.''];
-       }
-       else
-       {
-          return $r['en'] ;
-       }
-
+        $r = $this->getNameLocalized();
+        if (isset($r['' . $lang . '']))
+        {
+            return $r['' . $lang . ''];
+        }
+        else
+        {
+            return $r['en'];
+        }
     }
-
 
     public function getDisplayName($length = null)
     {
-        if (empty($length) or !is_integer($length) or strlen($this->displayname) <= $length)
+        if (empty($length) || !is_integer($length) || strlen($this->displayname) <= $length)
         {
             return $this->displayname;
         }
@@ -1949,11 +1961,21 @@ class Provider {
 
     public function getLocalDisplayName()
     {
-        if(!empty($this->ldisplayname))
+        if (!empty($this->ldisplayname))
         {
-          return unserialize($this->ldisplayname);
+            return unserialize($this->ldisplayname);
         }
         return array();
+    }
+
+    public function getMergedLocalDisplayName()
+    {
+        $r = $this->getLocalDisplayName();
+        if (!isset($r['en']) && !empty($this->displayname))
+        {
+            $r['en'] = $this->displayname;
+        }
+        return $r;
     }
 
     public function getLocalDisplayNamesToArray($type)
@@ -1973,77 +1995,73 @@ class Provider {
 
     public function getDisplayNameLocalized()
     {
-        if(!empty($this->ldisplayname))
+        if (!empty($this->ldisplayname))
         {
-           $p = unserialize($this->ldisplayname);
-           if (!array_key_exists('en', $p))
-           {
-               $p['en'] = $this->displayname;
-           }
-           return $p;
+            $p = unserialize($this->ldisplayname);
+            if (!array_key_exists('en', $p))
+            {
+                $p['en'] = $this->displayname;
+            }
+            return $p;
         }
         else
         {
-           return array('en'=>$this->displayname); 
-
+            return array('en' => $this->displayname);
         }
     }
 
-    public function getServicePartsToArray($name)
+    private function getServicePartsToArray($name)
     {
         $result = array();
         $ext = $this->getExtendMetadata();
-        foreach($ext as $e)
-        { 
-           $t = $e->getType();
-           if($t !== 'sp')
-           {
-              continue;
-           }
-           $n = $e->getElement();
-           $ns = $e->getNameSpace();
-           if($n === $name && $ns === 'mdui')
-           {
-              $l = $e->getAttributes();
-              $v = $e->getEvalue();
-              if(isset($l['xml:lang']) && !empty($v))
-              {
-                  $result[''.$l['xml:lang'].''] = $v;
-              }
-           }
-        }
-        if(count($result) == 0 && !isset($result['en']))
+        foreach ($ext as $e)
         {
-             if($name === 'DisplayName')
-             {
-                $m  = $this->getDisplayName() ;
-                if(empty($m))
+            $t = $e->getType();
+            if ($t !== 'sp')
+            {
+                continue;
+            }
+            $n = $e->getElement();
+            $ns = $e->getNameSpace();
+            if ($n === $name && $ns === 'mdui')
+            {
+                $l = $e->getAttributes();
+                $v = $e->getEvalue();
+                if (isset($l['xml:lang']) && !empty($v))
                 {
-                   $m = $this->getName();
+                    $result['' . $l['xml:lang'] . ''] = $v;
                 }
-                if(empty($m))
+            }
+        }
+        if (count($result) == 0)
+        {
+            if ($name === 'DisplayName')
+            {
+                $m = $this->getDisplayName();
+                if (empty($m))
                 {
-                   $m = $this->getEntityId();
+                    $m = $this->getName();
+                }
+                if (empty($m))
+                {
+                    $m = $this->getEntityId();
                 }
                 $result['en'] = $m;
-             }
-             elseif($name === 'Description')
-             {
-                $desc = $this->getDescription();
-                if(!empty($desc))
+            }
+            elseif ($name === 'Description')
+            {
+                if (!empty($desc))
                 {
-                   $result['en'] = $desc;
+                    $result['en'] = 'no description';
                 }
-             }
-
+            }
         }
         return $result;
-
     }
 
-    public function findOneSPbyName($name)
+    public function getDigest()
     {
-        return $this->_em->createQuery('SELECT u FROM Models\Provider u WHERE name = "' . $name . '"')->getResult();
+        return $this->digest;
     }
 
     public function getValidTo()
@@ -2059,12 +2077,12 @@ class Provider {
     /**
      * return boolean if entity is between validfrom and validto dates
      */
-    public function getIsValidFromTo()
+    public function isValidFromTo()
     {
         /**
          * @todo fix broken time for the momemnt reurns true
          */
-        $currentTime = new \DateTime("now",new \DateTimeZone('UTC'));
+        $currentTime = new \DateTime("now", new \DateTimeZone('UTC'));
         $validAfter = TRUE;
         $validBefore = TRUE;
         if (!empty($this->validfrom))
@@ -2124,7 +2142,7 @@ class Provider {
         return $this->extend;
     }
 
-    public function getIsStaticMetadata()
+    public function isStaticMetadata()
     {
         $c = $this->getStatic();
         $d = $this->getStaticMetadata();
@@ -2138,11 +2156,6 @@ class Provider {
         }
     }
 
-    public function getHomeUrl()
-    {
-        return $this->homeurl;
-    }
-
     public function getHelpdeskUrl()
     {
         return $this->helpdeskurl;
@@ -2150,13 +2163,13 @@ class Provider {
 
     public function getLocalHelpdeskUrl()
     {
-        if(!empty($this->lhelpdeskurl))
+        if (!empty($this->lhelpdeskurl))
         {
-           return unserialize($this->lhelpdeskurl);
+            return unserialize($this->lhelpdeskurl);
         }
         else
         {
-           return array();
+            return array();
         }
     }
 
@@ -2166,7 +2179,7 @@ class Provider {
         $p = unserialize($this->lhelpdeskurl);
         if (is_array($p))
         {
-            if (!array_key_exists('en', $p))
+            if (!array_key_exists('en', $p) && !empty($t['en']))
             {
                 $p['en'] = $t['en'];
             }
@@ -2175,7 +2188,7 @@ class Provider {
         {
             $p = $t;
         }
-        return $p;
+        return array_filter($p);
     }
 
     public function getPrivacyUrl()
@@ -2232,7 +2245,7 @@ class Provider {
         return $this->is_locked;
     }
 
-    public function  getPublicVisible()
+    public function getPublicVisible()
     {
         return !($this->hidepublic);
     }
@@ -2240,7 +2253,7 @@ class Provider {
     public function getAvailable()
     {
 
-        return ($this->is_active && $this->is_approved && $this->getIsValidFromTo());
+        return ($this->is_active && $this->is_approved && $this->isValidFromTo());
     }
 
     public function getLocal()
@@ -2250,14 +2263,13 @@ class Provider {
 
     public function getLocalAvailable()
     {
-        return ( $this->is_local && $this->is_active && $this->is_approved && $this->getIsValidFromTo());
+        return ( $this->is_local && $this->is_active && $this->is_approved && $this->isValidFromTo());
     }
 
     public function getDescription()
     {
         return $this->description;
     }
-
 
     public function getLocalDescriptionsToArray($type)
     {
@@ -2268,7 +2280,7 @@ class Provider {
             $t = $v->getType();
             $u = $v->getNameSpace();
             $e = $v->getElement();
-            if ($t === $type && $u  === 'mdui' && $e === 'Description')
+            if ($t === $type && $u === 'mdui' && $e === 'Description')
             {
                 $l = $v->getAttributes();
                 $result[$l['xml:lang']] = $v->getElementValue();
@@ -2276,8 +2288,6 @@ class Provider {
         }
         return $result;
     }
-
-
 
     public function getMduiDiscoHintToXML(\DOMElement $parent, $type = NULL)
     {
@@ -2294,22 +2304,21 @@ class Provider {
                 $extarray[] = $v;
             }
         }
-        if(count($extarray)>0)
+        if (count($extarray) > 0)
         {
-           $e = $parent->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:DiscoHints'); 
-           foreach($extarray as $dm)
-           {
-               $dnode = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:GeolocationHint');
-               $dnode->appendChild($e->ownerDocument->createTextNode($dm->getElementValue()));
-               $e->appendChild($dnode);
-           }
-           return $e;
+            $e = $parent->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:DiscoHints');
+            foreach ($extarray as $dm)
+            {
+                $dnode = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:GeolocationHint');
+                $dnode->appendChild($e->ownerDocument->createTextNode($dm->getElementValue()));
+                $e->appendChild($dnode);
+            }
+            return $e;
         }
         else
         {
-           return NULL;
+            return NULL;
         }
-       
     }
 
     /**
@@ -2326,12 +2335,12 @@ class Provider {
         /**
          * leave only elements matching criteria
          */
-        $extarray = array();
+        $extarray = array('DisplayName' => array(), 'Description' => array(), 'Logo' => array(), 'InformationURL' => array(), 'PrivacyStatementURL' => array());
         foreach ($ext as $v)
         {
             if ((strcasecmp($v->getType(), $type) == 0) && ($v->getNamespace() === 'mdui'))
             {
-                $extarray[''.$v->getElement().''][] = $v;
+                $extarray['' . $v->getElement() . ''][] = $v;
             }
         }
         if (isset($extarray['Logo']) || array_key_exists('Logo', $extarray))
@@ -2347,7 +2356,6 @@ class Provider {
         }
 
         $en_displayname = FALSE;
-        $en_description = FALSE;
         $en_informationurl = FALSE;
         $en_privacyurl = FALSE;
         $e = $parent->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:UIInfo');
@@ -2371,6 +2379,22 @@ class Provider {
                         $e->appendChild($dnode);
                     }
                 }
+                if ($en_displayname !== TRUE)
+                {
+                    $gd = $this->getDisplayName();
+                    if (empty($gd))
+                    {
+                        $gd = $this->getName();
+                    }
+                    if (empty($gd))
+                    {
+                        $gd = $this->getEntityId();
+                    }
+                    $dnode = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:DisplayName');
+                    $dnode->setAttribute('xml:lang', 'en');
+                    $dnode->appendChild($e->ownerDocument->createTextNode($gd));
+                    $e->appendChild($dnode);
+                }
             }
             elseif ($key === 'Description')
             {
@@ -2382,10 +2406,6 @@ class Provider {
                         $dnode = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:Description');
                         $dnode->setAttribute('xml:lang', '' . $lang['xml:lang'] . '');
                         $dnode->appendChild($e->ownerDocument->createTextNode($dm->getElementValue()));
-                        if ($lang['xml:lang'] === 'en')
-                        {
-                            $en_description = TRUE;
-                        }
                         $e->appendChild($dnode);
                     }
                 }
@@ -2407,6 +2427,17 @@ class Provider {
                         $e->appendChild($dnode);
                     }
                 }
+                if ($en_privacyurl !== TRUE)
+                {
+                    $gd = $this->getPrivacyUrl();
+                    if (!empty($gd))
+                    {
+                        $dnode = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:PrivacyStatementURL');
+                        $dnode->setAttribute('xml:lang', 'en');
+                        $dnode->appendChild($e->ownerDocument->createTextNode($gd));
+                        $e->appendChild($dnode);
+                    }
+                }
             }
             elseif ($key === 'InformationURL')
             {
@@ -2422,6 +2453,17 @@ class Provider {
                         {
                             $en_informationurl = TRUE;
                         }
+                        $e->appendChild($dnode);
+                    }
+                }
+                if ($en_informationurl !== TRUE)
+                {
+                    $gd = $this->getHelpdeskURL();
+                    if (!empty($gd))
+                    {
+                        $dnode = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:InformationURL');
+                        $dnode->setAttribute('xml:lang', 'en');
+                        $dnode->appendChild($e->ownerDocument->createTextNode($gd));
                         $e->appendChild($dnode);
                     }
                 }
@@ -2446,68 +2488,18 @@ class Provider {
 
                         foreach ($attrs as $akey => $avalue)
                         {
-                            if(!empty($avalue))
+                            if (!empty($avalue))
                             {
-                               $dnode->setAttribute($akey, $avalue);
+                                $dnode->setAttribute($akey, $avalue);
                             }
                         }
                     }
-                    
+
                     $e->appendChild($dnode);
                 }
             }
         }
-        if ($en_description !== TRUE)
-        {
-            $gd = $this->getDescription();
-            if (!empty($gd))
-            {
-               $dnode = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:Description');
-               $dnode->setAttribute('xml:lang', 'en');
-               $dnode->appendChild($e->ownerDocument->createTextNode($gd));
-               $e->appendChild($dnode);
-            }
-        }
 
-
-        if ($en_displayname !== TRUE)
-        {
-            $gd = $this->getDisplayName();
-            if (empty($gd))
-            {
-                $gd = $this->getName();
-            }
-            if (empty($gd))
-            {
-                $gd = $this->getEntityId();
-            }
-            $dnode = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:DisplayName');
-            $dnode->setAttribute('xml:lang', 'en');
-            $dnode->appendChild($e->ownerDocument->createTextNode($gd));
-            $e->appendChild($dnode);
-        }
-        if ($en_informationurl !== TRUE)
-        {
-            $gd = $this->getHelpdeskURL();
-            if (!empty($gd))
-            {
-                $dnode = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:InformationURL');
-                $dnode->setAttribute('xml:lang', 'en');
-                $dnode->appendChild($e->ownerDocument->createTextNode($gd));
-                $e->appendChild($dnode);
-            }
-        }
-        if ($en_privacyurl !== TRUE)
-        {
-            $gd = $this->getPrivacyUrl();
-            if (!empty($gd))
-            {
-                $dnode = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:ui', 'mdui:PrivacyStatementURL');
-                $dnode->setAttribute('xml:lang', 'en');
-                $dnode->appendChild($e->ownerDocument->createTextNode($gd));
-                $e->appendChild($dnode);
-            }
-        }
 
         return $e;
     }
@@ -2538,28 +2530,6 @@ class Provider {
         }
     }
 
-    public function getSupportedAttributes()
-    {
-        if ($this->type === 'IDP')
-        {
-            $finalArp = new \Doctrine\Common\Collections\ArrayCollection();
-
-            $arp = $this->attributeReleaseIDP;
-            foreach ($arp as $a)
-            {
-                if ($a->getIsDefault())
-                {
-                    $finalArp->add($a);
-                }
-            }
-        }
-        else
-        {
-            return false;
-        }
-        return $finalArp;
-    }
-
     public function getLastModified()
     {
         if (empty($this->updatedAt))
@@ -2572,28 +2542,27 @@ class Provider {
         }
     }
 
-    public function replaceContactCollection(Provider $provider)
-    {
-        $existingContacts = $this->getContacts();
-        $no_existingContacts = count($existing_Contacts);
-        $newContacts = $provider->getContacts();
-        $no_newContacts = count($newContacts);
-    }
-
     public function overwriteWithNameid(Provider $provider)
     {
         $this->nameids = serialize($provider->getNameIds());
-  
     }
 
-    public function convertToArray()
+    public function convertToArray($addmeta = FALSE)
     {
         $r = array();
         $r['id'] = $this->getId();
+        if ($addmeta === TRUE)
+        {
+            $m = $this->getProviderToXML()->saveXML();
+            if (!empty($m))
+            {
+                $r['metadata'] = base64_encode($m);
+            }
+        }
         $r['name'] = $this->getName();
         $r['displayname'] = $this->getDisplayname();
-        $r['entityid'] = $this->getEntityid();
-        
+        $r['entityid'] = $this->getEntityId();
+
         $r['nameid'] = array();
         $nameids = $this->getNameIds();
         if (!empty($nameids))
@@ -2609,12 +2578,10 @@ class Provider {
         $r['type'] = $this->getType();
         $r['scope'] = $this->getScope('idpsso');
         $r['aascope'] = $this->getScope('aa');
-        $r['homeurl'] = $this->getHomeUrl();
         $r['helpdeskurl'] = $this->getHelpdeskUrl();
         $r['privacyurl'] = $this->getPrivacyUrl();
         $r['validfrom'] = $this->getValidFrom();
         $r['validto'] = $this->getValidTo();
-        $r['description'] = $this->getDescription();
         $r['is_approved'] = $this->getApproved();
         $r['is_active'] = $this->getActive();
         $r['is_locked'] = $this->getLocked();
@@ -2651,14 +2618,15 @@ class Provider {
 
         $r['federations'] = array();
         $membership = $this->getMembership();
-        if (!empty($membership) && $membership->count()>0)
+        if (!empty($membership) && $membership->count() > 0)
         {
+            \log_message('debug', 'GKS found membership');
             foreach ($membership as $f)
             {
                 $state = $f->getJoinState();
-                if($state != 2)
+                if ($state != 2)
                 {
-                  $r['federations'][] = $f->getFederation()->convertToArray();
+                    $r['federations'][] = $f->getFederation()->convertToArray();
                 }
             }
         }
@@ -2681,7 +2649,7 @@ class Provider {
         $this->setEntityid($r['entityid']);
         if (is_array($r['nameid']) && count($r['nameid'] > 0))
         {
-            foreach ($r['nameid'] as $k=>$n)
+            foreach ($r['nameid'] as $k => $n)
             {
                 $this->setNameids($k, $n);
             }
@@ -2695,19 +2663,15 @@ class Provider {
             }
         }
 
-        // $this->setProtocol($r['protocol']);
         $this->setType($r['type']);
-        $this->setScope('idpsso',$r['scope']);
-        $this->setScope('aa',$r['aascope']);
-        $this->setHomeUrl($r['homeurl']);
+        $this->setScope('idpsso', $r['scope']);
+        $this->setScope('aa', $r['aascope']);
         $this->setHelpdeskUrl($r['helpdeskurl']);
         $this->setPrivacyUrl($r['privacyurl']);
         $this->setValidFrom($r['validfrom']);
         $this->setValidTo($r['validto']);
-        $this->setDescription($r['description']);
         $this->setApproved($r['is_approved']);
         $this->setActive($r['is_active']);
-        //$this->setLocked($r['is_locked']);
         $this->setStatic($r['is_static']);
         $this->setLocal($r['is_local']);
         if (count($r['contacts']) > 0)
@@ -2735,16 +2699,16 @@ class Provider {
         }
         if ($etype !== 'IDP')
         {
-            if(isset($r['details']['spssodescriptor']['extensions']['idpdisc']) && is_array($r['details']['spssodescriptor']['extensions']['idpdisc']))
-            { 
+            if (isset($r['details']['spssodescriptor']['extensions']['idpdisc']) && is_array($r['details']['spssodescriptor']['extensions']['idpdisc']))
+            {
                 foreach ($r['details']['spssodescriptor']['extensions']['idpdisc'] as $idpdisc)
                 {
-                   $c = new ServiceLocation;
-                   $c->setDiscoveryResponse($idpdisc['url'], $idpdisc['order']);
-                   $c->setProvider($this);
+                    $c = new ServiceLocation;
+                    $c->setDiscoveryResponse($idpdisc['url'], $idpdisc['order']);
+                    $c->setProvider($this);
                 }
             }
-            if(isset($r['details']['spssodescriptor']['extensions']['init']) && is_array($r['details']['spssodescriptor']['extensions']['init']))
+            if (isset($r['details']['spssodescriptor']['extensions']['init']) && is_array($r['details']['spssodescriptor']['extensions']['init']))
             {
                 foreach ($r['details']['spssodescriptor']['extensions']['init'] as $initreq)
                 {
@@ -2774,7 +2738,6 @@ class Provider {
                 $m->setFederation($c);
                 $m->setProvider($this);
                 $this->addMembership($m);
-              //  $this->setFederation($c);
             }
         }
     }
@@ -2784,57 +2747,63 @@ class Provider {
         $ns_md = 'urn:oasis:names:tc:SAML:2.0:metadata';
         $e = $parent->ownerDocument->createElementNS($ns_md, 'md:Organization');
 
-        $lorgnames = $this->getNameLocalized();
+        $lorgnames = $this->getMergedLocalName();
+        $ldorgnames = $this->getMergedLocalDisplayName();
+        $lurls = $this->getHelpdeskUrlLocalized();
+        if (count($lurls) == 0 || count($lorgnames) == 0 || count($ldorgnames) == 0)
+        {
+            \log_message('warning', 'Missing one of Organization elements , not generating Organization for entity: ' . $this->entityid);
+            return null;
+        }
         foreach ($lorgnames as $k => $v)
         {
-            if(!empty($v))
+            if (!empty($v))
             {
-               $OrganizationName_Node = $e->ownerDocument->createElementNS($ns_md, 'md:OrganizationName');
-               $OrganizationName_Node->setAttribute('xml:lang', '' . $k . '');
-               $OrganizationName_Node->appendChild($e->ownerDocument->createTextNode($v));
-               $e->appendChild($OrganizationName_Node);
+                $organizationNameNode = $e->ownerDocument->createElementNS($ns_md, 'md:OrganizationName');
+                $organizationNameNode->setAttribute('xml:lang', '' . $k . '');
+                $organizationNameNode->appendChild($e->ownerDocument->createTextNode($v));
+                $e->appendChild($organizationNameNode);
             }
         }
-        $ldorgnames = $this->getDisplayNameLocalized();
         foreach ($ldorgnames as $k => $v)
         {
-            if(!empty($v))
+            if (!empty($v))
             {
-               $OrganizationDisplayName_Node = $e->ownerDocument->createElementNS($ns_md, 'md:OrganizationDisplayName');
-               $OrganizationDisplayName_Node->setAttribute('xml:lang', '' . $k . '');
-               $OrganizationDisplayName_Node->appendChild($e->ownerDocument->createTextNode($v));
-               $e->appendChild($OrganizationDisplayName_Node);
+                $organizationDisplaynameNode = $e->ownerDocument->createElementNS($ns_md, 'md:OrganizationDisplayName');
+                $organizationDisplaynameNode->setAttribute('xml:lang', '' . $k . '');
+                $organizationDisplaynameNode->appendChild($e->ownerDocument->createTextNode($v));
+                $e->appendChild($organizationDisplaynameNode);
             }
         }
-        $lurls = $this->getHelpdeskUrlLocalized();
         foreach ($lurls as $k => $v)
         {
-            if(!empty($v))
+            if (!empty($v))
             {
-               $OrganizationURL_Node = $e->ownerDocument->createElementNS($ns_md, 'md:OrganizationURL');
-               $OrganizationURL_Node->setAttribute('xml:lang', '' . $k . '');
-               $OrganizationURL_Node->appendChild($e->ownerDocument->createTextNode($v));
-               $e->appendChild($OrganizationURL_Node);
+                $organizationUrlNode = $e->ownerDocument->createElementNS($ns_md, 'md:OrganizationURL');
+                $organizationUrlNode->setAttribute('xml:lang', '' . $k . '');
+                $organizationUrlNode->appendChild($e->ownerDocument->createTextNode($v));
+                $e->appendChild($organizationUrlNode);
             }
         }
 
         return $e;
     }
-    public function getIDPAADescriptorToXML(\DOMElement $parent, $options = null)
+
+    private function getIDPAADescriptorToXML(\DOMElement $parent)
     {
         $this->ci = & get_instance();
         $doFilter = array('IDPAttributeService');
         $services = $this->getServiceLocations()->filter(
-                    function($entry) use ($doFilter) {
-                        return in_array($entry->getType(), $doFilter);
-                    });
+                function(ServiceLocation $entry) use ($doFilter) {
+            return in_array($entry->getType(), $doFilter);
+        });
         $doCertFilter = array('aa');
         $certs = $this->getCertificates()->filter(
-                    function($entry) use ($doCertFilter) {
-                        return in_array($entry->getType(), $doCertFilter);
-                    });
+                function(Certificate $entry) use ($doCertFilter) {
+            return in_array($entry->getType(), $doCertFilter);
+        });
 
-        
+
         /**
          * do dont generate <AttributeAuthoritydescriptor if no service found
          */
@@ -2851,19 +2820,19 @@ class Provider {
         $e->setAttribute('protocolSupportEnumeration', $protocols);
 
         $scs = $this->getScope('aa');
-        if(is_array($scs) && count($scs)>0)
+        if (is_array($scs) && count($scs) > 0)
         {
-          $Extensions_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:Extensions');
-          foreach ($scs as $sc)
-          {
-            $Scope_Node = $Extensions_Node->ownerDocument->createElementNS('urn:mace:shibboleth:metadata:1.0', 'shibmd:Scope', trim($sc));
-            $Scope_Node->setAttribute('regexp', 'false');
-            $Extensions_Node->appendChild($Scope_Node);
-          }
-          $e->appendChild($Extensions_Node);
+            $Extensions_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:Extensions');
+            foreach ($scs as $sc)
+            {
+                $Scope_Node = $Extensions_Node->ownerDocument->createElementNS('urn:mace:shibboleth:metadata:1.0', 'shibmd:Scope', trim($sc));
+                $Scope_Node->setAttribute('regexp', 'false');
+                $Extensions_Node->appendChild($Scope_Node);
+            }
+            $e->appendChild($Extensions_Node);
         }
         $certs = $this->getCertificates();
-        log_message('debug',__METHOD__.' '. gettype($certs));
+        log_message('debug', __METHOD__ . ' ' . gettype($certs));
         if (!empty($certs))
         {
             $ncerts = $certs->count();
@@ -2874,57 +2843,30 @@ class Provider {
         }
         if ($ncerts === 0)
         {
-            log_message('debug', 'Provider '.$this->id.': no certificates found for AA ');
+            log_message('debug', 'Provider ' . $this->id . ': no certificates found for AA ');
             return NULL;
         }
         else
         {
-            $tmp_certs = array();
             foreach ($certs as $cert)
             {
                 $type = $cert->getType();
                 if ($type === 'aa')
                 {
-                    $certusage = $cert->getCertUse();
-                    if (empty($certusage))
-                    {
-                        $tmp_certs['all'][] = $cert;
-                    }
-                    else
-                    {
-                        $tmp_certs[$certusage] = $cert;
-                    }
                     $KeyDescriptor_Node = $cert->getCertificateToXML($e);
-                    if($KeyDescriptor_Node !== NULL)
+                    if ($KeyDescriptor_Node !== NULL)
                     {
-                       $e->appendChild($KeyDescriptor_Node);
+                        $e->appendChild($KeyDescriptor_Node);
                     }
                 }
             }
         }
-        /**
-         * @todo finish for rollover
-         */
-        /**
-          if(array_key_exists('all', $tmp_certs) && count($tmp_certs) == 1)
-          {
-          if(count($tmp_certs['all']) == 1)
-          {
-          $KeyDescriptor_Node = $cert->getCertificateToXML($e);
-          $e->appendChild($KeyDescriptor_Node);
-          }
-          else
-          {
-
-          }
-          }
-         */
         foreach ($services as $srv)
         {
-           $ServiceLocation_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:AttributeService');
-           $ServiceLocation_Node->setAttribute("Binding", $srv->getBindingName());
-           $ServiceLocation_Node->setAttribute("Location", $srv->getUrl());
-           $e->appendChild($ServiceLocation_Node);
+            $ServiceLocation_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:AttributeService');
+            $ServiceLocation_Node->setAttribute("Binding", $srv->getBindingName());
+            $ServiceLocation_Node->setAttribute("Location", $srv->getUrl());
+            $e->appendChild($ServiceLocation_Node);
         }
         $nameid = $this->getNameIds('aa');
         foreach ($nameid as $key)
@@ -2939,12 +2881,12 @@ class Provider {
         return $e;
     }
 
-    public function getIDPSSODescriptorToXML(\DOMElement $parent, $options = null)
+    private function getIDPSSODescriptorToXML(\DOMElement $parent)
     {
         $services = $this->getServiceLocations();
         if ($services->count() == 0)
         {
-            log_message('error',__METHOD__ .'no serviceLocations found for entityID:'.$this->entityid);
+            log_message('error', __METHOD__ . 'no serviceLocations found for entityID:' . $this->entityid);
             return null;
         }
         $this->logo_basepath = $this->ci->config->item('rr_logouriprefix');
@@ -2959,25 +2901,25 @@ class Provider {
         $e = $parent->ownerDocument->createElementNS($ns_md, 'md:IDPSSODescriptor');
         $protocol = $this->getProtocolSupport('idpsso');
         $protocols = implode(" ", $protocol);
-        if(empty($protocols))
+        if (empty($protocols))
         {
-            $protocols = 'urn:oasis:names:tc:SAML:2.0:protocol'; 
+            $protocols = 'urn:oasis:names:tc:SAML:2.0:protocol';
         }
         $e->setAttribute('protocolSupportEnumeration', $protocols);
         $Extensions_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:Extensions');
         $scs = $this->getScope('idpsso');
-        if(is_array($scs))
+        if (is_array($scs))
         {
-           foreach ($scs as $sc)
-           {
-               $sc = trim($sc);
-               if(!empty($sc))
-               {
-                  $Scope_Node = $Extensions_Node->ownerDocument->createElementNS('urn:mace:shibboleth:metadata:1.0', 'shibmd:Scope', $sc);
-                  $Scope_Node->setAttribute('regexp', 'false');
-                  $Extensions_Node->appendChild($Scope_Node);
-               }
-           }
+            foreach ($scs as $sc)
+            {
+                $sc = trim($sc);
+                if (!empty($sc))
+                {
+                    $Scope_Node = $Extensions_Node->ownerDocument->createElementNS('urn:mace:shibboleth:metadata:1.0', 'shibmd:Scope', $sc);
+                    $Scope_Node->setAttribute('regexp', 'false');
+                    $Extensions_Node->appendChild($Scope_Node);
+                }
+            }
         }
 
         /* UIInfo */
@@ -2986,18 +2928,18 @@ class Provider {
         {
             $Extensions_Node->appendChild($UIInfo_Node);
         }
-        $DiscoHints_Node =  $this->getMduiDiscoHintToXML($Extensions_Node, 'idp');
-        if(!empty($DiscoHints_Node))
+        $DiscoHints_Node = $this->getMduiDiscoHintToXML($Extensions_Node, 'idp');
+        if (!empty($DiscoHints_Node))
         {
-           $Extensions_Node->appendChild($DiscoHints_Node);
+            $Extensions_Node->appendChild($DiscoHints_Node);
         }
 
 
 
         $e->appendChild($Extensions_Node);
         $certs = $this->getCertificates();
-        log_message('debug',__LINE__ .' '. __METHOD__.': '. $certs->count());
-        log_message('debug',__LINE__ .' '. __METHOD__.': '. gettype($certs));
+        log_message('debug', __LINE__ . ' ' . __METHOD__ . ': ' . $certs->count());
+        log_message('debug', __LINE__ . ' ' . __METHOD__ . ': ' . gettype($certs));
         if (!empty($certs))
         {
             $ncerts = $certs->count();
@@ -3009,7 +2951,6 @@ class Provider {
             return NULL;
         }
 
-        $tmp_certs = array();
         if ($ncerts > 0)
         {
             $idpssocerts = 0;
@@ -3018,84 +2959,57 @@ class Provider {
                 $type = $cert->getType();
                 if ($type === 'idpsso')
                 {
-                    $certusage = $cert->getCertUse();
-                    if (empty($certusage))
-                    {
-                        $tmp_certs['all'][] = $cert;
-                    }
-                    else
-                    {
-                        $tmp_certs[$certusage] = $cert;
-                    }
                     $KeyDescriptor_Node = $cert->getCertificateToXML($e);
-                    if($KeyDescriptor_Node !== NULL)
+                    if ($KeyDescriptor_Node !== NULL)
                     {
-                       $e->appendChild($KeyDescriptor_Node);
-                       ++$idpssocerts;
+                        $e->appendChild($KeyDescriptor_Node);
+                        ++$idpssocerts;
                     }
                 }
             }
-            if($idpssocerts == 0)
+            if ($idpssocerts == 0)
             {
-               log_message('error','line '.__LINE__ .' '.__METHOD__.' '.$this->entityid.' no idpsso certs ');
-               return NULL;
+                log_message('error', 'line ' . __LINE__ . ' ' . __METHOD__ . ' ' . $this->entityid . ' no idpsso certs ');
+                return NULL;
             }
         }
-        /**
-         * @todo finish for rollover
-         */
-        /**
-          if(array_key_exists('all', $tmp_certs) && count($tmp_certs) == 1)
-          {
-          if(count($tmp_certs['all']) == 1)
-          {
-          $KeyDescriptor_Node = $cert->getCertificateToXML($e);
-          $e->appendChild($KeyDescriptor_Node);
-          }
-          else
-          {
-
-          }
-          }
-         */
-
-        $tmpserorder = array('logout'=>array(),'sso'=>array(),'artifact'=>array());
+        $tmpserorder = array('logout' => array(), 'sso' => array(), 'artifact' => array());
 
 
 
 
         foreach ($services as $srv)
         {
-            if (strcmp($srv->getType(), 'SingleSignOnService') == 0)
+            $srv_type = $srv->getType();
+            if (strcmp($srv_type, 'SingleSignOnService') == 0)
             {
                 $ServiceLocation_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:SingleSignOnService');
                 $ServiceLocation_Node->setAttribute("Binding", $srv->getBindingName());
                 $ServiceLocation_Node->setAttribute("Location", $srv->getUrl());
                 $tmpserorder['sso'][] = $ServiceLocation_Node;
             }
-            elseif ($srv->getType() === 'IDPSingleLogoutService')
+            elseif ($srv_type === 'IDPSingleLogoutService')
             {
                 $ServiceLocation_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:SingleLogoutService');
                 $ServiceLocation_Node->setAttribute("Binding", $srv->getBindingName());
                 $ServiceLocation_Node->setAttribute("Location", $srv->getUrl());
                 $tmpserorder['logout'][] = $ServiceLocation_Node;
             }
-            elseif($srv->getType() === 'IDPArtifactResolutionService')
+            elseif ($srv_type === 'IDPArtifactResolutionService')
             {
                 $ServiceLocation_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ArtifactResolutionService');
                 $ServiceLocation_Node->setAttribute("Binding", $srv->getBindingName());
                 $ServiceLocation_Node->setAttribute("Location", $srv->getUrl());
                 $ServiceLocation_Node->setAttribute("index", $srv->getOrder());
                 $tmpserorder['artifact'][] = $ServiceLocation_Node;
- 
             }
         }
-        foreach($tmpserorder['artifact'] as $p)
+        foreach ($tmpserorder['artifact'] as $p)
         {
             $e->appendChild($p);
         }
-        
-        foreach($tmpserorder['logout'] as $p)
+
+        foreach ($tmpserorder['logout'] as $p)
         {
             $e->appendChild($p);
         }
@@ -3105,7 +3019,7 @@ class Provider {
             $NameIDFormat_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:NameIDFormat', $key);
             $e->appendChild($NameIDFormat_Node);
         }
-        foreach($tmpserorder['sso'] as $p)
+        foreach ($tmpserorder['sso'] as $p)
         {
             $e->appendChild($p);
         }
@@ -3115,12 +3029,12 @@ class Provider {
 
     public function getSPSSODescriptorToXML(\DOMElement $parent, $options = null)
     {
-   
-     
+
+
         $services = $this->getServiceLocations();
-        if($services->count() == 0)
+        if ($services->count() == 0)
         {
-            log_message('error', __METHOD__.' no service location found for entityID:'.$this->entityid);
+            log_message('error', __METHOD__ . ' no service location found for entityID:' . $this->entityid);
             return null;
         }
 
@@ -3134,7 +3048,7 @@ class Provider {
 
         $e = $parent->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:SPSSODescriptor');
         $protocols = implode(" ", $this->getProtocolSupport('spsso'));
-        if(empty($protocols))
+        if (empty($protocols))
         {
             $protocols = 'urn:oasis:names:tc:SAML:2.0:protocol';
         }
@@ -3144,24 +3058,35 @@ class Provider {
         $e->appendChild($Extensions_Node);
 
         /* DiscoveryResponse */
-        
+
+        $discrespindex = array('-1');
         foreach ($services as $t)
         {
             $loc_type = $t->getType();
             if ($loc_type === 'RequestInitiator')
             {
-                $disc_node = $parent->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:profiles:SSO:request-init', 'init:RequestInitiator');
-                $disc_node->setAttribute('Binding', $t->getBindingName());
-                $disc_node->setAttribute('Location', $t->getUrl());
-                $Extensions_Node->appendChild($disc_node);
+                $discNode = $parent->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:profiles:SSO:request-init', 'init:RequestInitiator');
+                $discNode->setAttribute('Binding', $t->getBindingName());
+                $discNode->setAttribute('Location', $t->getUrl());
+                $Extensions_Node->appendChild($discNode);
             }
             elseif ($loc_type === 'DiscoveryResponse')
             {
-                $disc_node = $parent->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:profiles:SSO:idp-discovery-protocol', 'idpdisc:DiscoveryResponse');
-                $disc_node->setAttribute('Binding', $t->getBindingName());
-                $disc_node->setAttribute('Location', $t->getUrl());
-                $disc_node->setAttribute('index', $t->getOrder());
-                $Extensions_Node->appendChild($disc_node);
+                $discNode = $parent->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:profiles:SSO:idp-discovery-protocol', 'idpdisc:DiscoveryResponse');
+                $discNode->setAttribute('Binding', $t->getBindingName());
+                $discNode->setAttribute('Location', $t->getUrl());
+                $discorder = $t->getOrder();
+                if (is_null($discorder) || in_array($discorder, $discrespindex))
+                {
+                    $discorder = max($discrespindex) + 1;
+                    $discrespindex[] = $discorder;
+                }
+                else
+                {
+                    $discrespindex[] = $discorder;
+                }
+                $discNode->setAttribute('index', $discorder);
+                $Extensions_Node->appendChild($discNode);
             }
         }
         /* UIInfo */
@@ -3170,17 +3095,6 @@ class Provider {
         {
             $Extensions_Node->appendChild($UIInfo_Node);
         }
-        $DiscoHints_Node = $this->getMduiDiscoHintToXML($Extensions_Node, 'sp');
-        if (!empty($DiscoHints_Node))
-        {
-            $Extensions_Node->appendChild($DiscoHints_Node);
-        }
-
-
-        /**
-         * @todo check if certificates as rtquired fo SP 
-         */
-       // $certs = $this->getCertificates();
 
         foreach ($this->getCertificates() as $cert)
         {
@@ -3188,16 +3102,14 @@ class Provider {
             {
 
                 $KeyDescriptor_Node = $cert->getCertificateToXML($e);
-                if($KeyDescriptor_Node !== NULL)
+                if ($KeyDescriptor_Node !== NULL)
                 {
-                   $e->appendChild($KeyDescriptor_Node);
+                    $e->appendChild($KeyDescriptor_Node);
                 }
             }
         }
 
-        // $services = $this->getServiceLocations();
-
-        $tmpserorder = array('logout'=>array(),'assert'=>array(),'art'=>array());
+        $tmpserorder = array('logout' => array(), 'assert' => array(), 'art' => array());
         foreach ($services as $srv)
         {
             $stype = $srv->getType();
@@ -3219,7 +3131,7 @@ class Provider {
                 $ServiceLocation_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:SingleLogoutService');
                 $ServiceLocation_Node->setAttribute("Binding", $srv->getBindingName());
                 $ServiceLocation_Node->setAttribute("Location", $srv->getUrl());
-                $tmpserorder['logout'][] =  $ServiceLocation_Node;
+                $tmpserorder['logout'][] = $ServiceLocation_Node;
             }
             elseif ($stype === 'SPArtifactResolutionService')
             {
@@ -3227,14 +3139,14 @@ class Provider {
                 $ServiceLocation_Node->setAttribute("Binding", $srv->getBindingName());
                 $ServiceLocation_Node->setAttribute("Location", $srv->getUrl());
                 $ServiceLocation_Node->setAttribute("index", $srv->getOrder());
-                $tmpserorder['art'][] =  $ServiceLocation_Node;
+                $tmpserorder['art'][] = $ServiceLocation_Node;
             }
         }
-        foreach($tmpserorder['art'] as $p)
+        foreach ($tmpserorder['art'] as $p)
         {
             $e->appendChild($p);
         }
-        foreach($tmpserorder['logout'] as $p)
+        foreach ($tmpserorder['logout'] as $p)
         {
             $e->appendChild($p);
         }
@@ -3243,13 +3155,13 @@ class Provider {
             $NameIDFormat_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:NameIDFormat', $v);
             $e->appendChild($NameIDFormat_Node);
         }
-        
-        foreach($tmpserorder['assert'] as $p)
+
+        foreach ($tmpserorder['assert'] as $p)
         {
             $e->appendChild($p);
         }
         $tmpserorder = null;
-        if (!empty($options) and is_array($options) and array_key_exists('attrs', $options) and !empty($options['attrs']))
+        if (!empty($options) and is_array($options) and array_key_exists('attrs', $options) and ! empty($options['attrs']))
         {
             $sp_reqattrs = $this->getAttributesRequirement();
             $sp_reqattrs_count = $sp_reqattrs->count();
@@ -3257,58 +3169,60 @@ class Provider {
             {
                 foreach ($sp_reqattrs->getValues() as $v)
                 {
-                    $in = $v->getAttribute()->showInMetadata();
-                    if ($in === FALSE)
+                    $reqattr = $v->getAttribute();
+                    if (!empty($reqattr))
                     {
+                        $in = $reqattr->showInMetadata();
+                        if ($in === FALSE)
+                        {
 
-                        $sp_reqattrs->removeElement($v);
+                            $sp_reqattrs->removeElement($v);
+                        }
                     }
                 }
             }
             $sp_reqattrs_count = $sp_reqattrs->count();
             if ($sp_reqattrs_count > 0)
             {
-                $Attrconsumingservice_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:AttributeConsumingService');
-                $Attrconsumingservice_Node->setAttribute('index', '0');
-                $e->appendChild($Attrconsumingservice_Node);
+                $attrConsumingServiceNode = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:AttributeConsumingService');
+                $attrConsumingServiceNode->setAttribute('index', '0');
+                $e->appendChild($attrConsumingServiceNode);
                 /**
                  * set servicename, servicedesc based on in order mdui, md
                  */
-
                 $sericenames = $this->getServicePartsToArray('DisplayName');
-                foreach($sericenames as $k=>$v)
+                foreach ($sericenames as $k => $v)
                 {
-                    $srvname_node = $Attrconsumingservice_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ServiceName');
-                    $srvname_node->setAttribute('xml:lang', ''.$k.'');
-                    $srvname_node->appendChild($Attrconsumingservice_Node->ownerDocument->createTextNode($v));
-                    $Attrconsumingservice_Node->appendChild($srvname_node);
+                    $srvnameNode = $attrConsumingServiceNode->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ServiceName');
+                    $srvnameNode->setAttribute('xml:lang', '' . $k . '');
+                    $srvnameNode->appendChild($attrConsumingServiceNode->ownerDocument->createTextNode($v));
+                    $attrConsumingServiceNode->appendChild($srvnameNode);
                 }
 
                 $servicenamesDesc = $this->getServicePartsToArray('Description');
-                foreach($servicenamesDesc as $k=>$v)
+                foreach ($servicenamesDesc as $k => $v)
                 {
-                    $srvdisplay_node = $Attrconsumingservice_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ServiceDescription');
-                    $srvdisplay_node->setAttribute('xml:lang', ''.$k.'');
-                    $srvdisplay_node->appendChild($Attrconsumingservice_Node->ownerDocument->createTextNode($v));
-                    $Attrconsumingservice_Node->appendChild($srvdisplay_node);
- 
+                    $srvdisplay_node = $attrConsumingServiceNode->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ServiceDescription');
+                    $srvdisplay_node->setAttribute('xml:lang', '' . $k . '');
+                    $srvdisplay_node->appendChild($attrConsumingServiceNode->ownerDocument->createTextNode($v));
+                    $attrConsumingServiceNode->appendChild($srvdisplay_node);
                 }
 
                 foreach ($sp_reqattrs->getValues() as $v)
                 {
-                    $attr_node = $Attrconsumingservice_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:RequestedAttribute');
-                    $attr_node->setAttribute('FriendlyName', $v->getAttribute()->getName());
-                    $attr_node->setAttribute('Name', $v->getAttribute()->getOid());
-                    $attr_node->setAttribute('NameFormat', 'urn:oasis:names:tc:SAML:2.0:attrname-format:uri');
+                    $attrNode = $attrConsumingServiceNode->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:RequestedAttribute');
+                    $attrNode->setAttribute('FriendlyName', $v->getAttribute()->getName());
+                    $attrNode->setAttribute('Name', $v->getAttribute()->getOid());
+                    $attrNode->setAttribute('NameFormat', 'urn:oasis:names:tc:SAML:2.0:attrname-format:uri');
                     if ($v->getStatus() == 'required')
                     {
-                        $attr_node->setAttribute('isRequired', 'true');
+                        $attrNode->setAttribute('isRequired', 'true');
                     }
                     else
                     {
-                        $attr_node->setAttribute('isRequired', 'false');
+                        $attrNode->setAttribute('isRequired', 'false');
                     }
-                    $Attrconsumingservice_Node->appendChild($attr_node);
+                    $attrConsumingServiceNode->appendChild($attrNode);
                 }
             }
             else
@@ -3316,39 +3230,39 @@ class Provider {
 
                 if (array_key_exists('fedreqattrs', $options) && is_array($options['fedreqattrs']))
                 {
-                    $Attrconsumingservice_Node = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:AttributeConsumingService');
-                    $Attrconsumingservice_Node->setAttribute('index', '0');
-                    $e->appendChild($Attrconsumingservice_Node);
+                    $attrConsumingServiceNode = $e->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:AttributeConsumingService');
+                    $attrConsumingServiceNode->setAttribute('index', '0');
+                    $e->appendChild($attrConsumingServiceNode);
                     $t_name = $this->getName();
                     if (empty($t_name))
                     {
                         $t_name = $this->getEntityId();
                     }
-                    $srvname_node = $Attrconsumingservice_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ServiceName', $t_name);
-                    $srvname_node->setAttribute('xml:lang', 'en');
-                    $Attrconsumingservice_Node->appendChild($srvname_node);
-                    $t_displayname = $this->getDisplayName();
-                    if (!empty($t_displayname))
+                    $srvnameNode = $attrConsumingServiceNode->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ServiceName', $t_name);
+                    $srvnameNode->setAttribute('xml:lang', 'en');
+                    $attrConsumingServiceNode->appendChild($srvnameNode);
+                    $tDisplayname = $this->getDisplayName();
+                    if (!empty($tDisplayname))
                     {
-                        $srvdisplay_node = $Attrconsumingservice_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ServiceDescription', $t_displayname);
+                        $srvdisplay_node = $attrConsumingServiceNode->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ServiceDescription', $tDisplayname);
                         $srvdisplay_node->setAttribute('xml:lang', 'en');
-                        $Attrconsumingservice_Node->appendChild($srvdisplay_node);
+                        $attrConsumingServiceNode->appendChild($srvdisplay_node);
                     }
                     foreach ($options['fedreqattrs'] as $v)
                     {
-                        $attr_node = $Attrconsumingservice_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:RequestedAttribute');
-                        $attr_node->setAttribute('FriendlyName', $v->getAttribute()->getName());
-                        $attr_node->setAttribute('Name', $v->getAttribute()->getOid());
-                        $attr_node->setAttribute('NameFormat', 'urn:oasis:names:tc:SAML:2.0:attrname-format:uri');
+                        $attrNode = $attrConsumingServiceNode->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:RequestedAttribute');
+                        $attrNode->setAttribute('FriendlyName', $v->getAttribute()->getName());
+                        $attrNode->setAttribute('Name', $v->getAttribute()->getOid());
+                        $attrNode->setAttribute('NameFormat', 'urn:oasis:names:tc:SAML:2.0:attrname-format:uri');
                         if ($v->getStatus() == 'required')
                         {
-                            $attr_node->setAttribute('isRequired', 'true');
+                            $attrNode->setAttribute('isRequired', 'true');
                         }
                         else
                         {
-                            $attr_node->setAttribute('isRequired', 'false');
+                            $attrNode->setAttribute('isRequired', 'false');
                         }
-                        $Attrconsumingservice_Node->appendChild($attr_node);
+                        $attrConsumingServiceNode->appendChild($attrNode);
                     }
                 }
             }
@@ -3367,51 +3281,15 @@ class Provider {
      */
     public function getProviderToXML(\DOMElement $parent = NULL, $options = NULL)
     {
-        log_message('debug', __METHOD__. ' start:  ' . $this->entityid);
+        log_message('debug', __METHOD__ . ' start:  ' . $this->entityid);
         $comment = "\"" . $this->getEntityId() . "\" \n";
-        $l = 1;
-
-        /**
-         * defauls values
-         */
-        $attrs_in_sp = FALSE;
-        $only_allowed = FALSE;
-        $type = $this->type;
-        /**
-         * condition when XML may be returned
-         */
-        if (!empty($options) && is_array($options) && count($options) > 0)
-        {
-
-            if (array_key_exists('attr_inc', $options))
-            {
-                $attrs_in_sp = $options['attr_inc'];
-            }
-        }
-
-        /**
-         * do not return if active required and entity disabled
-         */
-      //  $p_active = $this->getAvailable();
-
-      //  if ($only_allowed && empty($p_active))
-      //  {
-      //      log_message('debug', "skip gen xml for inactive provider with id:" . $this->id);
-      //      return \NULL;
-      //  }
-
-  
         $s_metadata = null;
         $valid_until = null;
         $p_validUntil = $this->getValidTo();
         if (!empty($p_validUntil))
         {
-            //$valid_until = $p_validUntil->format('Y-m-d') . "T00:00:00Z";
             $valid_until = $p_validUntil->format('Y-m-d\TH:i:s\Z');
         }
-
-
-
         if ($this->is_static)
         {
             $static_meta = $this->getStaticMetadata();
@@ -3422,7 +3300,7 @@ class Provider {
             }
             else
             {
-                log_message('error', __METHOD__.': Static metadata is enabled but empty for entity (id: ' . $this->id . '):' . $this->entityid);
+                log_message('error', __METHOD__ . ': Static metadata is enabled but empty for entity (id: ' . $this->id . '):' . $this->entityid);
                 return null;
             }
         }
@@ -3450,7 +3328,7 @@ class Provider {
                 }
                 else
                 {
-                    \log_message('error',__METHOD__.' '.$this->entityid .' : static is enabled but cant import into domnode'); 
+                    \log_message('error', __METHOD__ . ' ' . $this->entityid . ' : static is enabled but cant import into domnode');
                     return null;
                 }
                 return $docXML;
@@ -3491,9 +3369,19 @@ class Provider {
 
 
         $EntityDesc_Node->setAttribute('entityID', $this->getEntityId());
+        if ($this->is_local && function_exists('customGenerateEntityDescriptorID'))
+        {
+            $cid = customGenerateEntityDescriptorID(array('id' => '' . $this->getId() . '', 'entityid' => '' . $this->getEntityId() . ''));
+            if (!empty($cid))
+            {
+
+                $EntityDesc_Node->setAttribute('ID', $cid);
+            }
+        }
         $ci = & get_instance();
         if (!empty($this->registrar))
         {
+            \log_message('debug', 'GKS not empty registrar');
             $EntExtension_Node = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:Extensions');
             $EntityDesc_Node->appendChild($EntExtension_Node);
             $RegistrationInfo_Node = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:rpi', 'mdrpi:RegistrationInfo');
@@ -3509,7 +3397,7 @@ class Provider {
             $configRegistrar = $ci->config->item('registrationAutority');
             $configRegistrationPolicy = $ci->config->item('registrationPolicy');
             $configRegistrarLoad = $ci->config->item('load_registrationAutority');
-            if(!empty($configRegistrarLoad) && !empty($configRegistrar))
+            if (!empty($configRegistrarLoad) && !empty($configRegistrar))
             {
                 $EntExtension_Node = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:Extensions');
                 $EntityDesc_Node->appendChild($EntExtension_Node);
@@ -3517,36 +3405,88 @@ class Provider {
                 $RegistrationInfo_Node->setAttribute('registrationAuthority', $configRegistrar);
                 if (!empty($this->registerdate))
                 {
-                   $RegistrationInfo_Node->setAttribute('registrationInstant', $this->registerdate->format('Y-m-d') . 'T' . $this->registerdate->format('H:i:s') . 'Z');
+                    $RegistrationInfo_Node->setAttribute('registrationInstant', $this->registerdate->format('Y-m-d') . 'T' . $this->registerdate->format('H:i:s') . 'Z');
                 }
                 $EntExtension_Node->appendChild($RegistrationInfo_Node);
             }
         }
-        if(!empty($RegistrationInfo_Node))
-        {
-           $regpolicies = $this->getRegistrationPolicy();
-           if(count($regpolicies)>0)
-           {
-              foreach($regpolicies as $rkey=>$rvalue)
-              {
-                  $RegPolicyNode = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:rpi', 'mdrpi:RegistrationPolicy');
-                  $RegPolicyNode->setAttribute('xml:lang',$rkey);
-                  $RegPolicyNode->appendChild($RegistrationInfo_Node->ownerDocument->createTextNode($rvalue));
-                  $RegistrationInfo_Node->appendChild($RegPolicyNode);
-              }
-           }
-           elseif($this->is_local === TRUE && empty($this->registrar) && !empty($configRegistrationPolicy) && !empty($configRegistrarLoad))
-           {
-                  $RegPolicyNode = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:rpi', 'mdrpi:RegistrationPolicy');
-                  $RegPolicyNode->setAttribute('xml:lang','en');
-                  $RegPolicyNode->appendChild($EntityDesc_Node->ownerDocument->createTextNode($configRegistrationPolicy));
-                  $RegistrationInfo_Node->appendChild($RegPolicyNode);
 
-           }
+
+        $cocs = $this->getCoc();
+        $entityCategories = array();
+        $registrationPolicies = array();
+        foreach ($cocs as $k => $v)
+        {
+            \log_message('debug', 'GKS provider model coc');
+            $cocsenabled = $v->getAvailable();
+            $cocstype = $v->getType();
+            $cocsubtype = $v->getSubtype();
+            if ($cocsenabled === TRUE)
+            {
+                if ($cocstype === 'entcat' && !empty($cocsubtype))
+                {
+                    $entityCategories['' . $cocsubtype . ''][] = $v;
+                }
+                elseif ($cocstype === 'regpol')
+                {
+                    $registrationPolicies[] = $v;
+                    \log_message('debug', 'GKS provider model entcat: ' . $v->getUrl());
+                }
+            }
         }
 
+        if (!empty($RegistrationInfo_Node))
+        {
+            if (count($registrationPolicies) > 0)
+            {
+                \log_message('debug', 'GKS provider generating XML for entcat');
+                $langsset = array();
+                foreach ($registrationPolicies as $v)
+                {
+                    $vlang = $v->getLang();
+                    if (in_array($vlang, $langsset))
+                    {
+                        \log_message('error', __METHOD__ . ' multiple registration policies are set for lang:' . $vlang . ' for entityId: ' . $this->entityid);
+                        continue;
+                    }
+                    $langsset[] = $vlang;
+                    $RegPolicyNode = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:rpi', 'mdrpi:RegistrationPolicy');
+                    $RegPolicyNode->setAttribute('xml:lang', $v->getLang());
+                    $RegPolicyNode->appendChild($RegistrationInfo_Node->ownerDocument->createTextNode($v->getUrl()));
+                    \log_message('debug', 'GKS .. add entvcat to xml: ' . $v->getLang() . ': ' . $v->getUrl());
+                    $RegistrationInfo_Node->appendChild($RegPolicyNode);
+                }
+                unset($langsset);
+            }
+            elseif ($this->is_local === TRUE && empty($this->registrar) && !empty($configRegistrationPolicy) && !empty($configRegistrarLoad))
+            {
+                $RegPolicyNode = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:rpi', 'mdrpi:RegistrationPolicy');
+                $RegPolicyNode->setAttribute('xml:lang', 'en');
+                $RegPolicyNode->appendChild($EntityDesc_Node->ownerDocument->createTextNode($configRegistrationPolicy));
+                $RegistrationInfo_Node->appendChild($RegPolicyNode);
+            }
+        }
 
-        if ($type !== 'SP')
+        if (count($entityCategories) > 0)
+        {
+            $AttributesGroup_Node = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:attribute', 'mdattr:EntityAttributes');
+            $EntExtension_Node->appendChild($AttributesGroup_Node);
+            foreach ($entityCategories as $key => $value)
+            {
+                $Attribute_Node = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:assertion', 'saml:Attribute');
+                $Attribute_Node->setAttribute('Name', '' . $key . '');
+                $Attribute_Node->setAttribute('NameFormat', 'urn:oasis:names:tc:SAML:2.0:attrname-format:uri');
+                $AttributesGroup_Node->appendChild($Attribute_Node);
+                foreach ($value as $v)
+                {
+                    $Attribute_Value = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:assertion', 'saml:AttributeValue');
+                    $Attribute_Value->appendChild($Attribute_Node->ownerDocument->createTextNode($v->getUrl()));
+                    $Attribute_Node->appendChild($Attribute_Value);
+                }
+            }
+        }
+
+        if ($this->type !== 'SP')
         {
             $SSODesc_Node = $this->getIDPSSODescriptorToXML($EntityDesc_Node);
             if (!empty($SSODesc_Node))
@@ -3555,36 +3495,18 @@ class Provider {
             }
             else
             {
-                \log_message('error', __FILE__.' line '.__LINE__ . ' '.__METHOD__."Provider model: IDP/BOTH type but IDPSSODescriptor is null. Metadata for " . $this->getEntityId() . " couldnt be generated");
+                \log_message('error', __FILE__ . ' line ' . __LINE__ . ' ' . __METHOD__ . "Provider model: IDP/BOTH type but IDPSSODescriptor is null. Metadata for " . $this->getEntityId() . " couldnt be generated");
                 return null;
             }
             $AA_Node = $this->getIDPAADescriptorToXML($EntityDesc_Node);
-            if(!empty($AA_Node))
+            if (!empty($AA_Node))
             {
                 $EntityDesc_Node->appendChild($AA_Node);
             }
-           
         }
-        if ($type !== 'IDP')
+        if ($this->type !== 'IDP')
         {
-            $dataprotection = $this->getCoc();
 
-            if (!empty($dataprotection))
-            {
-                $dataprotenabled = $dataprotection->getAvailable();
-                if ($dataprotenabled === TRUE)
-                {
-                    $AttributesGroup_Node = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:metadata:attribute', 'mdattr:EntityAttributes');
-                    $EntExtension_Node->appendChild($AttributesGroup_Node);
-                    $Attribute_Node = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:assertion', 'saml:Attribute');
-                    $Attribute_Node->setAttribute('Name', 'http://macedir.org/entity-category');
-                    $Attribute_Node->setAttribute('NameFormat', 'urn:oasis:names:tc:SAML:2.0:attrname-format:uri');
-                    $AttributesGroup_Node->appendChild($Attribute_Node);
-                    $Attribute_Value = $EntityDesc_Node->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:assertion', 'saml:AttributeValue');
-                    $Attribute_Value->appendChild($Attribute_Node->ownerDocument->createTextNode($dataprotection->getUrl()));
-                    $Attribute_Node->appendChild($Attribute_Value);
-                }
-            }
             $SSODesc_Node = $this->getSPSSODescriptorToXML($EntityDesc_Node, $options);
             if (!empty($SSODesc_Node))
             {
@@ -3592,15 +3514,15 @@ class Provider {
             }
             else
             {
-                \log_message('error', ' line '.__LINE__.' '.__METHOD__.' SP/BOTH type but SPSSODescriptor is null cant genereate metadata for: '.$this->entityid);
+                \log_message('error', ' line ' . __LINE__ . ' ' . __METHOD__ . ' SP/BOTH type but SPSSODescriptor is null cant genereate metadata for: ' . $this->entityid);
                 return null;
             }
         }
 
         $Organization_Node = $this->getOrganizationToXML($EntityDesc_Node);
-        if($Organization_Node->hasChildNodes())
+        if ($Organization_Node !== null && $Organization_Node->hasChildNodes())
         {
-           $EntityDesc_Node->appendChild($Organization_Node);
+            $EntityDesc_Node->appendChild($Organization_Node);
         }
         $contacts = $this->getContacts();
 
@@ -3625,9 +3547,9 @@ class Provider {
      *
      * extensions inside IDPSSODEscriptor (idp) or SPSODescriptor (sp)
      */
-    private function SSODescriptorExtensionsFromArray($ext, $type)
+    private function ssoDescriptorExtensionsFromArray($ext, $type)
     {
-        $parentUIInfo  = new ExtendMetadata;
+        $parentUIInfo = new ExtendMetadata;
         $parentUIInfo->setNamespace('mdui');
         $parentUIInfo->setElement('UIInfo');
         $parentUIInfo->setAttributes(array());
@@ -3638,15 +3560,15 @@ class Provider {
 
         if (array_key_exists('scope', $ext))
         {
-            $this->setScope('idpsso',$ext['scope']);
+            $this->setScope('idpsso', $ext['scope']);
         }
         if (array_key_exists('aascope', $ext))
         {
-            $this->setScope('aa',$ext['aascope']);
+            $this->setScope('aa', $ext['aascope']);
         }
         if (array_key_exists('geo', $ext) && is_array($ext['geo']))
         {
-            \log_message('debug',__METHOD__.': geo');
+            \log_message('debug', __METHOD__ . ': geo');
             $parentgeo = new ExtendMetadata;
             $parentgeo->setNamespace('mdui');
             $parentgeo->setElement('DiscoHints');
@@ -3664,27 +3586,18 @@ class Provider {
         }
         if (array_key_exists('desc', $ext) && is_array($ext['desc']))
         {
-            $ldesc = array();
             foreach ($ext['desc'] as $k => $p)
             {
-                if ($p['lang'] === 'en')
-                {
-                    $this->setDescription($p['val']);
-                }
-                $ldesc[$p['lang']] = $p['val'];
                 $extdesc = new ExtendMetadata;
                 $extdesc->setNamespace('mdui');
                 $extdesc->setType($type);
                 $extdesc->setElement('Description');
                 $extdesc->setValue($p['val']);
-                $extdesc->setAttributes(array('xml:lang'=>$p['lang']));
+                $extdesc->setAttributes(array('xml:lang' => $p['lang']));
                 $extdesc->setProvider($this);
                 $this->setExtendMetadata($extdesc);
                 $extdesc->setParent($parentUIInfo);
             }
-            
-            
-            
         }
         if (array_key_exists('displayname', $ext) && is_array($ext['displayname']))
         {
@@ -3695,7 +3608,7 @@ class Provider {
                 $extdesc->setType($type);
                 $extdesc->setElement('DisplayName');
                 $extdesc->setValue($p['val']);
-                $extdesc->setAttributes(array('xml:lang'=>$p['lang']));
+                $extdesc->setAttributes(array('xml:lang' => $p['lang']));
                 $extdesc->setProvider($this);
                 $this->setExtendMetadata($extdesc);
                 $extdesc->setParent($parentUIInfo);
@@ -3710,7 +3623,7 @@ class Provider {
                 $extdesc->setType($type);
                 $extdesc->setElement('PrivacyStatementURL');
                 $extdesc->setValue($p['val']);
-                $extdesc->setAttributes(array('xml:lang'=>$p['lang']));
+                $extdesc->setAttributes(array('xml:lang' => $p['lang']));
                 $extdesc->setProvider($this);
                 $this->setExtendMetadata($extdesc);
                 $extdesc->setParent($parentUIInfo);
@@ -3725,7 +3638,7 @@ class Provider {
                 $extdesc->setType($type);
                 $extdesc->setElement('InformationURL');
                 $extdesc->setValue($p['val']);
-                $extdesc->setAttributes(array('xml:lang'=>$p['lang']));
+                $extdesc->setAttributes(array('xml:lang' => $p['lang']));
                 $extdesc->setProvider($this);
                 $this->setExtendMetadata($extdesc);
                 $extdesc->setParent($parentUIInfo);
@@ -3733,13 +3646,12 @@ class Provider {
         }
         if (array_key_exists('logo', $ext) && is_array($ext['logo']))
         {
-            \log_message('debug','GK logo provider');
+            \log_message('debug', 'GK logo provider');
             foreach ($ext['logo'] as $k => $p)
             {
                 $extdesc = new ExtendMetadata;
-                $extdesc->setLogo($p['val'], $this, $parentUIInfo, array('width'=>$p['width'],'height'=>$p['height'],'xml:lang'=>$p['xml:lang']), $type);
+                $extdesc->setLogo($p['val'], $this, $parentUIInfo, array('width' => $p['width'], 'height' => $p['height'], 'xml:lang' => $p['xml:lang']), $type);
                 $this->setExtendMetadata($extdesc);
-
             }
         }
         if ($type == 'sp')
@@ -3749,7 +3661,7 @@ class Provider {
                 foreach ($ext['idpdisc'] as $idpdiscs)
                 {
                     $disc = new ServiceLocation;
-                    $disc->setDiscoveryResponse($idpdiscs['url'], @$idpdiscs['index)']);
+                    $disc->setDiscoveryResponse($idpdiscs['url'], @$idpdiscs['order']);
                     $disc->setProvider($this);
                     $this->setServiceLocation($disc);
                 }
@@ -3767,35 +3679,34 @@ class Provider {
         }
     }
 
-    private function  AADescriptorFromArray($b)
+    private function aaDescriptorFromArray($b)
     {
-        if(array_key_exists('protocols',$b))
+        if (array_key_exists('protocols', $b))
         {
-           $this->setProtocolSupport('aa',$b['protocols']);
+            $this->setProtocolSupport('aa', $b['protocols']);
         }
         if (array_key_exists('extensions', $b))
         {
-            $this->SSODescriptorExtensionsFromArray($b['extensions'], 'aa');
+            $this->ssoDescriptorExtensionsFromArray($b['extensions'], 'aa');
         }
         if (array_key_exists('nameid', $b) && is_array($b['nameid']))
         {
-           $this->setNameIds('aa',$b['nameid']);
+            $this->setNameIds('aa', $b['nameid']);
         }
         if (array_key_exists('attributeservice', $b))
         {
-           foreach($b['attributeservice'] as $aval)
-           {
-              $aa =  new ServiceLocation;
-              $aa->setType('IDPAttributeService');
-              $aa->setBindingName($aval['binding']);
-              $aa->setUrl($aval['location']);
-              $aa->setProvider($this);
-              $this->setServiceLocation($aa);
-           }
+            foreach ($b['attributeservice'] as $aval)
+            {
+                $aa = new ServiceLocation;
+                $aa->setType('IDPAttributeService');
+                $aa->setBindingName($aval['binding']);
+                $aa->setUrl($aval['location']);
+                $aa->setProvider($this);
+                $this->setServiceLocation($aa);
+            }
         }
-        if (array_key_exists('certificate', $b) && count($b['certificate']) > 0)
+        if (array_key_exists('certificate', $b))
         {
-
             foreach ($b['certificate'] as $c)
             {
                 $cert = new Certificate();
@@ -3825,63 +3736,43 @@ class Provider {
                 $this->setCertificate($cert);
             }
         }
-        
     }
-    private function IDPSSODescriptorFromArray($b)
+
+    private function idpSSODescriptorFromArray($b)
     {
         if (array_key_exists('extensions', $b))
         {
-            $this->SSODescriptorExtensionsFromArray($b['extensions'], 'idp');
+            $this->ssoDescriptorExtensionsFromArray($b['extensions'], 'idp');
         }
 
         if (array_key_exists('nameid', $b) && is_array($b['nameid']))
         {
-           $this->setNameIds('idpsso',$b['nameid']);
+            $this->setNameIds('idpsso', $b['nameid']);
         }
         if (array_key_exists('servicelocations', $b))
         {
-            if(isset($b['servicelocations']['singlesignonservice']) && is_array($b['servicelocations']['singlesignonservice']))
+            $tmpsrcl = array('singlesignonservice' => 'SingleSignOnService', 'singlelogout' => 'IDPSingleLogoutService', 'artifactresolutionservice' => 'IDPArtifactResolutionService');
+            foreach ($tmpsrcl as $kc => $vc)
             {
-                 foreach ($b['servicelocations']['singlesignonservice'] as $s)
-                 {
-                     $sso = new ServiceLocation;
-                     $sso->setType('SingleSignOnService');
-                     $sso->setBindingName($s['binding']);
-                     $sso->setUrl($s['location']);
-                     $sso->setProvider($this);
-                     $this->setServiceLocation($sso);
-
-                 }
-            }            
-            if(isset($b['servicelocations']['singlelogout']) && is_array($b['servicelocations']['singlelogout']))
-            {
-                 foreach ($b['servicelocations']['singlelogout'] as $s)
-                 {
-                     $sso = new ServiceLocation;
-                     $sso->setType('IDPSingleLogoutService');
-                     $sso->setBindingName($s['binding']);
-                     $sso->setUrl($s['location']);
-                     $sso->setProvider($this);
-                     $this->setServiceLocation($sso);
-
-                 }
-            }            
-            if(isset($b['servicelocations']['artifactresolutionservice']) && is_array($b['servicelocations']['artifactresolutionservice']))
-            {
-                 foreach ($b['servicelocations']['artifactresolutionservice'] as $s)
-                 {
-                     $srv = new ServiceLocation;
-                     $srv->setType('IDPArtifactResolutionService');
-                     $srv->setBindingName($s['binding']);
-                     $srv->setUrl($s['location']);
-                     $srv->setOrder($s['order']);
-                     $srv->setProvider($this);
-                     $this->setServiceLocation($srv);
-
-                 }
-            }            
+                if (isset($b['servicelocations']['' . $kc . '']) && is_array($b['servicelocations']['' . $kc . '']))
+                {
+                    foreach ($b['servicelocations']['' . $kc . ''] as $s)
+                    {
+                        $sso = new ServiceLocation;
+                        $sso->setType($vc);
+                        $sso->setBindingName($s['binding']);
+                        $sso->setUrl($s['location']);
+                        if ($vc === 'IDPArtifactResolutionService')
+                        {
+                            $sso->setOrder($s['order']);
+                        }
+                        $sso->setProvider($this);
+                        $this->setServiceLocation($sso);
+                    }
+                }
+            }
         }
-        $this->setProtocolSupport('idpsso',$b['protocols']);
+        $this->setProtocolSupport('idpsso', $b['protocols']);
         if (array_key_exists('certificate', $b) && count($b['certificate']) > 0)
         {
 
@@ -3917,21 +3808,21 @@ class Provider {
         return $this;
     }
 
-    private function SPSSODescriptorFromArray($b)
+    private function spSSODescriptorFromArray($b)
     {
         if (array_key_exists('extensions', $b))
         {
-            $this->SSODescriptorExtensionsFromArray($b['extensions'], 'sp');
+            $this->ssoDescriptorExtensionsFromArray($b['extensions'], 'sp');
         }
         if (array_key_exists('nameid', $b) && is_array($b['nameid']))
         {
-           $this->setNameIds('spsso',$b['nameid']);
+            $this->setNameIds('spsso', $b['nameid']);
         }
         if (array_key_exists('protocols', $b))
         {
-            $this->setProtocolSupport('spsso',$b['protocols']);
+            $this->setProtocolSupport('spsso', $b['protocols']);
         }
-        if(isset($b['servicelocations']['assertionconsumerservice']) && is_array($b['servicelocations']['assertionconsumerservice']))
+        if (isset($b['servicelocations']['assertionconsumerservice']) && is_array($b['servicelocations']['assertionconsumerservice']))
         {
 
             foreach ($b['servicelocations']['assertionconsumerservice'] as $s)
@@ -3952,7 +3843,7 @@ class Provider {
                 $this->setServiceLocation($sso);
             }
         }
-        if(isset($b['servicelocations']['artifactresolutionservice']) && is_array($b['servicelocations']['artifactresolutionservice']))
+        if (isset($b['servicelocations']['artifactresolutionservice']) && is_array($b['servicelocations']['artifactresolutionservice']))
         {
 
             foreach ($b['servicelocations']['artifactresolutionservice'] as $s)
@@ -3973,8 +3864,8 @@ class Provider {
                 $this->setServiceLocation($sso);
             }
         }
-       
-        if(isset($b['servicelocations']['singlelogout']) && is_array($b['servicelocations']['singlelogout']))
+
+        if (isset($b['servicelocations']['singlelogout']) && is_array($b['servicelocations']['singlelogout']))
         {
 
             foreach ($b['servicelocations']['singlelogout'] as $s)
@@ -4021,7 +3912,45 @@ class Provider {
         return $this;
     }
 
-    public function setProviderFromArray($a)
+    public function setReqAttrsFromArray($ent, $attributesByName)
+    {
+        if (isset($ent['details']['reqattrs']))
+        {
+            \log_message('info', 'DI1');
+            $attrsset = array();
+            foreach ($ent['details']['reqattrs'] as $r)
+            {
+                if (array_key_exists($r['name'], $attributesByName))
+                {
+                    if (!in_array($r['name'], $attrsset))
+                    {
+                        $reqattr = new AttributeRequirement;
+                        $reqattr->setAttribute($attributesByName['' . $r['name'] . '']);
+                        $reqattr->setType('SP');
+                        $reqattr->setSP($this);
+                        if (isset($r['req']) && strcasecmp($r['req'], 'true') == 0)
+                        {
+                            $reqattr->setStatus('required');
+                        }
+                        else
+                        {
+                            $reqattr->setStatus('desired');
+                        }
+                        $reqattr->setReason('');
+                        $this->setAttributesRequirement($reqattr);
+                        $attrsset[] = $r['name'];
+                    }
+                }
+                else
+                {
+                    log_message('warning', 'Attr couldnt be set as required becuase doesnt exist in attrs table: ' . $r['name']);
+                }
+            }
+        }
+        return $this;
+    }
+
+    public function setProviderFromArray($a, $full = FALSE)
     {
         if (!is_array($a))
         {
@@ -4029,11 +3958,11 @@ class Provider {
         }
         $this->setType($a['type']);
         $this->setEntityId($a['entityid']);
-        if(!empty($a['coc']))
+        if (!empty($a['coc']))
         {
             /**
              * @todo set CodeOfConduct
-             */ 
+             */
         }
         if (!empty($a['validuntil']))
         {
@@ -4050,6 +3979,18 @@ class Provider {
                 $this->setRegistrationDate(\DateTime::createFromFormat('Y-m-d H:i:s', $p[0] . ' ' . $ptime));
             }
         }
+        if ($full & !empty($a['regpol']))
+        {
+            foreach ($a['regpol'] as $v)
+            {
+                \log_message('debug', 'GKS SS regpollll');
+                $b = $this->em->getRepository("models\Coc")->findOneBy(array('type' => 'regpol', 'is_enabled' => true, 'lang' => $v['lang'], 'url' => $v['url']));
+                if (!empty($b))
+                {
+                    $this->setCoc($b);
+                }
+            }
+        }
         if (!empty($a['metadata']))
         {
             $m = new StaticMetadata;
@@ -4060,76 +4001,56 @@ class Provider {
         {
             foreach ($a['details']['org'] as $k => $o)
             {
-                if($k === 'OrganizationName')
-                {
-                   $lorgname = array();
-                   foreach($o as $k1=>$v1)
-                   {
-                       if($k1 === 'en')
-                       {
-                           $this->setName($v1);
-                       }
-                       else
-                       {
-                           $lorgname[''.$k1.''] = $v1;
-                       }
-                   }
-                   $this->setLocalName($lorgname);
-                }
-                elseif($k === 'OrganizationDisplayName')
+                if ($k === 'OrganizationName')
                 {
                     $lorgname = array();
-                    foreach($o as $k1=>$v1)
+                    foreach ($o as $k1 => $v1)
                     {
-                       if($k1 === 'en')
-                       {
-                           $this->setDisplayName($v1);
-                       }
-                       else
-                       {
-                           $lorgname[''.$k1.''] = $v1;
-                       }
-                    
+                        if ($k1 === 'en')
+                        {
+                            $this->setName($v1);
+                        }
+                        else
+                        {
+                            $lorgname['' . $k1 . ''] = $v1;
+                        }
+                    }
+                    $this->setLocalName($lorgname);
+                }
+                elseif ($k === 'OrganizationDisplayName')
+                {
+                    $lorgname = array();
+                    foreach ($o as $k1 => $v1)
+                    {
+                        if ($k1 === 'en')
+                        {
+                            $this->setDisplayName($v1);
+                        }
+                        else
+                        {
+                            $lorgname['' . $k1 . ''] = $v1;
+                        }
                     }
                     $this->setLocalDisplayName($lorgname);
-          
                 }
                 elseif ($k === 'OrganizationURL')
                 {
                     $lorgname = array();
-                    foreach ($o as $k1=>$v1)
+                    foreach ($o as $k1 => $v1)
                     {
-                       if ( $k1 === 'en')
-                       {
-                           $this->setHelpdeskUrl($v1);
-                       }
-                       else
-                       {
-                           $lorgname[$k1] = $v1;
-                       }
+                        if ($k1 === 'en')
+                        {
+                            $this->setHelpdeskUrl($v1);
+                        }
+                        else
+                        {
+                            $lorgname[$k1] = $v1;
+                        }
                     }
                     $this->setLocalHelpdeskUrl($lorgname);
                 }
             }
 
-            foreach ($a['details']['regpolicy'] as $rp)
-            {
-                /**
-                 * extend regpolicy 
-                 */
-            }
-            if(array_key_exists('regpolicy',$a['details']))
-            {
-                if(is_array($a['details']['regpolicy']))
-                {
-                     $this->setRegistrationPolicyFromArray($a['details']['regpolicy'], TRUE);
-                }
-                else
-                {
-                     $this->resetRegistrationPolicy();
-                }
-
-            }
 
             foreach ($a['details']['contacts'] as $c)
             {
@@ -4146,20 +4067,20 @@ class Provider {
                 if (array_key_exists('idpssodescriptor', $a['details']))
                 {
 
-                    $this->IDPSSODescriptorFromArray($a['details']['idpssodescriptor']);
+                    $this->idpSSODescriptorFromArray($a['details']['idpssodescriptor']);
                 }
                 if (array_key_exists('aadescriptor', $a['details']))
                 {
-                    \log_message('debug' , 'GKL import aa');
+                    \log_message('debug', 'GKL import aa');
 
-                    $this->AADescriptorFromArray($a['details']['aadescriptor']);
+                    $this->aaDescriptorFromArray($a['details']['aadescriptor']);
                 }
             }
             if ($a['type'] !== 'IDP')
             {
                 if (array_key_exists('spssodescriptor', $a['details']))
                 {
-                    $this->SPSSODescriptorFromArray($a['details']['spssodescriptor']);
+                    $this->spSSODescriptorFromArray($a['details']['spssodescriptor']);
                 }
             }
         }

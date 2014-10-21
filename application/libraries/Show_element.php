@@ -60,20 +60,22 @@ class Show_element {
         }
         $arps = $this->tmp_policies->getSPPolicy($id);
         $no_arps = count($arps);
-        if ($no_arps = 0)
+        if ($no_arps == 0)
         {
             return null;
         }
 
-        $custom_arps = $this->tmp_policies->getCustomSpPolicyAttributes($provider);
+        $customArps = $this->tmp_policies->getCustomSpPolicyAttributes($provider);
         $c_arps = array();
-        foreach ($custom_arps as $key)
-        {
-            $c_arps[$key->getRequester()][$key->getAttribute()->getName()]['id'] = $key->getId();
-            $c_arps[$key->getRequester()][$key->getAttribute()->getName()]['custom'] = $key->getRawdata();
-            $c_arps[$key->getRequester()][$key->getAttribute()->getName()]['attr_id'] = $key->getAttribute()->getId();
-            $c_arps[$key->getRequester()][$key->getAttribute()->getName()]['status'] = null;
-            $spid = $key->getRequester();
+        foreach ($customArps as $cArp)
+        { 
+            $c_arps[$cArp->getRequester()][$cArp->getAttribute()->getName()] = array(
+                'id'=>$cArp->getId(),
+                'custom'=>$cArp->getRawdata(),
+                'attr_id'=>$cArp->getAttribute()->getId(),
+                'status'=>null
+            );         
+            $spid = $cArp->getRequester();
             $sp_requester = $this->tmp_providers->getOneSpById($spid);
             $requesterName = $sp_requester->getName();
             $this->entitiesmaps[$sp_requester->getEntityId()] = $requesterName;
@@ -150,7 +152,6 @@ class Show_element {
                }
             }
         } 
-        $result3 = array();
         if (!empty($result2) && is_array($result2) && count($result) > 0)
         {
             foreach ($result2 as $key => $value)
@@ -272,9 +273,9 @@ class Show_element {
         $source = $this->displaySpecificArp($provider);
         $attributes = array();
         $supported_attrs_url = base_url() . "manage/supported_attributes/idp/" . $provider->getId();
-        $prefix_url = base_url() . "manage/attribute_policy/detail/";
-        $prefix_multi_url = base_url() . "manage/attribute_policy/multi/";
-        $icon = base_url() . "images/icons/pencil-field.png";
+        $prefix_url = base_url() . "manage/attributepolicy/detail/";
+        $prefix_multi_url = base_url() . "manage/attributepolicy/multi/";
+        $icon = '<i class="fi-pencil"></i>';
         if (!empty($source))
         {
             foreach ($source as $key => $value)
@@ -284,7 +285,7 @@ class Show_element {
                 {
                     $tmp_spid = $tmp_sp_array['spid'];
                 }
-                $link_sp = '<a href="' . $prefix_multi_url . $provider->getId() . '/sp/' . $tmp_spid . '"><img src="' . $icon . '"/></a>';
+                $link_sp = '<a href="' . $prefix_multi_url . $provider->getId() . '/sp/' . $tmp_spid . '">'.$icon.'</a>';
                 if (in_array($key, $exluded_arps))
                 {
                     $lbl = '<span class="lbl lbl-disabled">'.lang('lbl_excluded').'</span> ';
@@ -315,7 +316,7 @@ class Show_element {
                     {
                         $policy_id = $attr_value['id'];
                     }
-                    $link = anchor($prefix_url . "" . $provider->getId() . "/" . $attr_value['attr_id'] . "/sp/" . $attr_value['spid'], '<img src="' . $icon . '"/>');
+                    $link = anchor($prefix_url  . $provider->getId() . '/' . $attr_value['attr_id'] . '/sp/' . $attr_value['spid'],  $icon );
                     $permited_values = '';
                     $denied_values = '';
                     $lng_permitedval = lang('rr_permvalues');
@@ -342,7 +343,7 @@ class Show_element {
                             $denied_values .="</dl>";
                         }
                     }
-                    $custom_link = anchor(base_url() . "manage/custom_policies/idp/" . $provider->getId() . "/" . $attr_value['spid'] . "/" . $attr_value['attr_id'], '<img src="' . $icon . '"/>');
+                    $custom_link = anchor(base_url() . "manage/custom_policies/idp/" . $provider->getId() . "/" . $attr_value['spid'] . "/" . $attr_value['attr_id'], $icon );
 
                     $attributes[] = array($attr_name . $link, $attr_value['status'], $attr_value['policy'] . '<br /><div ><b>'.lang('custompolicy').'</b>' . $custom_link .  $permited_values  . $denied_values . '</div>');
                 }
@@ -372,8 +373,8 @@ class Show_element {
         }
         $source = $this->displayFederationsArp($provider);
         $attributes = array();
-        $prefix_url = base_url() . 'manage/attribute_policy/detail/';
-        $icon = base_url() . 'images/icons/pencil-field.png';
+        $prefix_url = base_url() . 'manage/attributepolicy/detail/';
+        $icon = '<i class="fi-pencil"></i>';
         if (!empty($source))
         {
             $tmpl = array('table_open' => '<table  id="detailsnosort">');
@@ -389,7 +390,7 @@ class Show_element {
                 $attributes[] = array('data' => array('data' => ''.lang('rr_federation').': <b>' . $s['fedname'] . '</b>', 'colspan' => 2, 'class' => 'highlight'));
                 foreach ($s['attrs'] as $attr_key => $attr_value)
                 {
-                    $edit_link = anchor($prefix_url . "" . $provider->getId() . "/" . $attr_value['attrid'] . "/fed/" . $s['fedid'], '<img src="' . $icon . '"/>');
+                    $edit_link = anchor($prefix_url . "" . $provider->getId() . "/" . $attr_value['attrid'] . "/fed/" . $s['fedid'], $icon );
                     if (!array_key_exists($attr_value['name'], $supported_attrs))
                     {
                         $attr_name = '<span class="alert" title="'.lang('attrnotsupported').'">' . $attr_value['name'] . '</span>';
@@ -411,8 +412,8 @@ class Show_element {
     {
         $source = $this->displayDefaultArp($provider);
         $attributes = array();
-        $prefix_url = base_url() . 'manage/attribute_policy/detail/';
-        $icon = base_url() . 'images/icons/pencil-field.png';
+        $prefix_url = base_url() . 'manage/attributepolicy/detail/';
+        $icon = '<i class="fi-pencil"></i>';
         $supported = $this->tmp_policies->getSupportedAttributes($provider);
         $supported_attrs = array();
         foreach ($supported as $sa)
@@ -433,7 +434,7 @@ class Show_element {
                 {
                     $attr_name = $s['name'];
                 }
-                $link = anchor($prefix_url . "" . $provider->getId() . "/" . $s['attrid'] . "/global/0", '<img src="' . $icon . '"/>');
+                $link = anchor($prefix_url . "" . $provider->getId() . "/" . $s['attrid'] . "/global/0",  $icon );
                 $attributes[] = array('' . $attr_name . '' . $link . '', $s['release']);
             }
 
@@ -485,9 +486,20 @@ class Show_element {
         $meminactive = makeLabel('disabled',lang('membership_inactive'),lang('membership_inactive'));
         $membanned = makeLabel('disabled',lang('membership_banned'),lang('membership_banned'));
         $providerdisabled = makeLabel('disabled',lang('rr_inactive'),lang('rr_inactive'));
-        $result = '<div class="zebramembers">';
+        
+        $result = '<div  class="zebramembers">';
+        $pname = array();
+        $pentity = array();
+        foreach($members as $key => $row)
+        {
+             $pname[$key]  = $row['pname'];
+             $pentity[$key] = $row['entityid'];
+        }
+        array_multisort($pname, SORT_STRING, $pentity, SORT_STRING, $members);
+        $nr = 1;
         foreach($members as $m)
         {
+           
            $t1 = '';
            $t2 = '';
            $t3 = '';
@@ -503,65 +515,24 @@ class Show_element {
            {
               $t3 = $providerdisabled;
            }
-           $result .= '<div><a href="'.$urlprefix.$m['pid'].'">'.$m['pname'].'</a> <small>'.$m['entityid'].'</small><div style="float: right">'.$t1.' '.$t2.' '.$t3.'</div></div>';
+           if($nr%2)
+           {
+              $rowclass = 'odd';
+           }
+           else
+           {
+              $rowclass = 'even';
+           }
+           $result .= '<div class="small-12 columns '.$rowclass.'"><div class="large-5 columns">'.$nr++.'. <a href="'.$urlprefix.$m['pid'].'">'.$m['pname'].'</a></div><div class="large-5 columns">'.$m['entityid'].'</div><div class="large-2 columns text-right">'.$t1.' '.$t2.' '.$t3.'</div></div>';
         }
         $result .='</div>';
 
         return $result;
     }
 
-    /**
-     * $members must be array of models\Provider objects 
-     */
-    public function IdPMembersToTable(array $members)
-    {
-        $cell_with_idp_members = '<div><div class="firstLine"><span class="col1">&nbsp;</span><span class="col2">&nbsp;</span><span class="col3">&nbsp;</span></div>';
-        $cell_with_sp_members = '<div><div class="firstLine"><span class="col1">&nbsp;</span><span class="col2">&nbsp;</span><span class="col3">&nbsp;</span></div>';
-        $cell_with_both_members = '<div><div class="firstLine"><span class="col1">&nbsp;</span><span class="col2">&nbsp;</span><span class="col3">&nbsp;</span></div>';
-        foreach ($members as $m)
-        {
-            $m_type = $m->getType();
-            $m_id = $m->getId();
-
-            $inactive = '';
-            $alertclass = '';
-            if (!($m->getAvailable()))
-            {
-                $inactive = '<span class"alert">'.lang('rr_inactive').'</span>';
-                $alertclass = 'class="alert"';
-            }
-            $m_link = base_url() . 'providers/detail/show/' . $m_id;
-            $m_entityid = $m->getEntityId();
-            $m_displayname = $m->getName();
-            if (empty($m_displayname))
-            {
-                $m_displayname = $m_entityid;
-            }
-            if ($m_type === 'IDP')
-            {
-                $cell_with_idp_members .= '<div ' . $alertclass . '><span class="col1"></span><span class="homeorg" class="col2">'. anchor($m_link, $m_displayname, 'title="' . $m->getDescription() . '"') . ' <small><i>'.$m->getEntityId().'</i></small></span><span class="col3">&nbsp;</span></div>';
-            }
-            if ($m_type === 'SP')
-            {
-                $cell_with_sp_members .= '<div ' . $alertclass . '> <span class="col1"></span><span class="col2">' . anchor($m_link, $m_displayname, 'title="' . $m->getDescription() . '"') . '  </span> <small><i>'.$m->getEntityId().'</i></small><span class="col3">&nbsp;</span></div>';
-            }
-            if ($m_type == 'BOTH')
-            {
-                $cell_with_both_members .= '<div ' . $alertclass . '><span class="col1"></span> <span class="col2">' . anchor($m_link, $m_displayname, 'title="' . $m->getDescription() . '"') . '  </span><span class="col3">&nbsp;</span></div>';
-            }
-        }
-        $cell_with_idp_members .= '<div class="lastLine"></div></div><div class="cleaner"></div>';
-        $cell_with_sp_members .= '<div class="lastLine"></div></div><div class="cleaner"></div>';
-        $cell_with_both_members .= '<div class="lastLine"></div></div><div class="cleaner"></div>';
-
-        $result['IDP'] = $cell_with_idp_members;
-        $result['SP'] = $cell_with_sp_members;
-        $result['BOTH'] = $cell_with_both_members;
-        return $result;
-    }
     public function generateRequestsList(models\Provider $idp, $count = null)
     {
-        if (empty($count) or !is_numeric($count) or $count < 1)
+        if (empty($count) || !is_numeric($count) || $count < 1)
         {
             $count = 5;
         }
@@ -572,9 +543,8 @@ class Show_element {
         {
             return null;
         }
-        $no_results = count($tracks);
-
-        $result = '<ul>';
+        $mcounter = 0;
+        $result = '<dl class="accordion" data-accordion="requestsList">';
         foreach ($tracks as $t)
         {
             $det = $t->getDetail();
@@ -586,16 +556,19 @@ class Show_element {
             {
                 $user = lang('unknown');
             }
-            $result .= '<li><span class="accordionButton"><b>' . date('Y-m-d H:i:s',$t->getCreated()->format('U')+j_auth::$timeOffset) . '</b> '.lang('made_by').' <b>' . $user . '</b> '.lang('from').' <b>' . $t->getIp() . '</b><br/>'.lang('rr_details').'</span><span class="accordionContent"><br />' . $y . '</span></li>';
+            $result .='<dd class="accordion-navigation">';
+            $result .= '<a href="#rmod'.$mcounter.'">'.date('Y-m-d H:i:s',$t->getCreated()->format('U')+j_auth::$timeOffset) .' ' .lang('made_by').' <b>' . $user . '</b> '.lang('from').' ' . $t->getIp() .'</a><div id="rmod'.$mcounter.'" class="content">' . $y . '</div>';
+            $result .='</dd>';
+            $mcounter++;
             $this->ci->table->clear();
         }
-        $result .= '</ul>';
+        $result .= '</dl>';
         return $result;
     }
 
     public function generateModificationsList(models\Provider $idp, $count = null)
     {
-        if (empty($count) or !is_numeric($count) or $count < 1)
+        if (empty($count) || !is_numeric($count) || $count < 1)
         {
             $count = 5;
         }
@@ -608,12 +581,12 @@ class Show_element {
         }
         $no_results = count($tracks);
 
-        $result = '<ul>';
+        $result = '<dl class="accordion" data-accordion="modificationsList">';
+        $mcounter = 0;
         foreach ($tracks as $t)
         {
             $modArray = unserialize($t->getDetail());
             $chng = array();
-            $i = 0;
             foreach ($modArray as $ckey => $cvalue)
             {
                 $chng[$ckey] = array(
@@ -629,9 +602,12 @@ class Show_element {
             {
                 $user = lang('unknown');
             }
-            $result .= '<li><span class="accordionButton"><b>' . date('Y-m-d H:i:s',$t->getCreated()->format('U')+j_auth::$timeOffset) . '</b> '.lang('chng_made_by').' <b>' . $user . '</b> '.lang('from').' <b>' . $t->getIp() . '</b><br/>'.lang('rr_details').'</span><span class="accordionContent"><br />' . $y . '</span></li>';
+            $result .='<dd class="accordion-navigation">';
+            $result .= '<a href="#mod'.$mcounter.'">'.date('Y-m-d H:i:s',$t->getCreated()->format('U')+j_auth::$timeOffset) .' ' .lang('chng_made_by').' <b>' . $user . '</b> '.lang('from').' ' . $t->getIp() .'</a><div id="mod'.$mcounter.'" class="content">' . $y . '</div>';
+            $result .='</dd>';
+            $mcounter++;
         }
-        $result .= '</ul>';
+        $result .= '</dl>';
         return $result;
     }
 

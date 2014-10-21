@@ -39,8 +39,37 @@ class Sp_list extends MY_Controller {
         $this->load->library('zacl');
     }
 
-    function show($limit=null)
+    function showlist()
     {
+
+        MY_Controller::$menuactive = 'sps';
+        $this->title = lang('title_splist');
+        $this->load->helper('iconhelp');
+        $resource = 'sp_list';
+        $action = 'read';
+        $group = 'default';
+        $has_read_access = $this->zacl->check_acl($resource, $action, $group, '');
+        if (!$has_read_access)
+        {
+            $data['content_view'] = 'nopermission';
+            $data['error'] = lang('rerror_nopermtolistidps');
+            $this->load->view('page', $data);
+            return;
+        }
+
+        $data['entitytype'] = 'sp';
+        $data['titlepage'] = lang('rr_tbltitle_listsps');
+        $data['subtitlepage'] = ' ';
+
+        $data['content_view'] = 'providers/providers_list_view';
+        $this->load->view('page',$data);
+
+    }
+   
+    // depreacted to be removed
+    private function show($limit=null)
+    {
+        MY_Controller::$menuactive = 'sps';
         $this->title = lang('title_splist');
         $this->load->helper('iconhelp');
         $lockicon = '<span class="lbl lbl-locked">'.lang('rr_locked').'</span>';
@@ -65,21 +94,25 @@ class Sp_list extends MY_Controller {
         if(empty($limit))
         {
             $data['typesps'] = 'local';
+            $t = lang('rr_tbltitle_listlocalsps');
             $sps = $tmp_providers->getSpsLightLocal();
         }
         elseif($limit === 'ext')
         {
+           $t = lang('rr_tbltitle_listextsps');
            $data['typesps'] = 'external';
            $sps = $tmp_providers->getSpsLightExternal();
         }
         else
         {
+            $t =  lang('rr_tbltitle_listsps');
             $data['typesps'] = 'all';
             $sps = $tmp_providers->getSpsLight();
         }
 
       
         $data['sps_count'] = count($sps);
+        $data['titlepage'] = $t. ' (' . lang('rr_found') . ' ' . $data['sps_count'] . ')';
         $linktitle_disexp = lang('rr_disexp_link_title');
         $lang = MY_Controller::getLang();
         foreach ($sps as $i)
@@ -94,7 +127,7 @@ class Sp_list extends MY_Controller {
             {
                $iconsblock .= $disabledicon .' ';
             }
-            if(!($i->getIsValidFromTo()))
+            if(!($i->isValidFromTo()))
             {
                $iconsblock .= $expiredicon .' ';
             }
@@ -127,10 +160,10 @@ class Sp_list extends MY_Controller {
             }
             if ($is_available)
             {
-                $sprows[] = array(anchor($i_link, $displayname . '', 'title="' . $displayname . '"') . '<span class="additions s2">' . $i->getEntityId() . '</span>',$iconsblock,$regcol, '<div class="squiz s2"><a href="' . $i->getHelpdeskUrl() . '" title="' . $i->getHelpdeskUrl() . '">' .$i->getHelpdeskUrl().'</a></div>');
+                $sprows[] = array(anchor($i_link, $displayname . '', 'title="' . $displayname . '"') . '<div class="additions s2">' . $i->getEntityId() . '</div>',$iconsblock,$regcol, '<div class="squiz s2"><a href="' . $i->getHelpdeskUrl() . '" title="' . $i->getHelpdeskUrl() . '">' .$i->getHelpdeskUrl().'</a></div>');
             } else
             {
-                $sprows[] = array('<span class="alert" title="'.$linktitle_disexp.'">' . anchor($i_link, $displayname , 'title="' . $displayname . '"') . '</span><span class="additions s2">' . $i->getEntityId() . '</span>',$iconsblock,$regcol, '<div class="squiz s2"><a href="' . $i->getHelpdeskUrl() . '" title="' . $i->getHelpdeskUrl() . '">'.$i->getHelpdeskUrl().'</a></div>');
+                $sprows[] = array('<span class="alert" title="'.$linktitle_disexp.'">' . anchor($i_link, $displayname , 'title="' . $displayname . '"') . '</span><div class="additions s2">' . $i->getEntityId() . '</div>',$iconsblock,$regcol, '<div class="squiz s2"><a href="' . $i->getHelpdeskUrl() . '" title="' . $i->getHelpdeskUrl() . '">'.$i->getHelpdeskUrl().'</a></div>');
             }
         }
         $data['sprows'] = $sprows;

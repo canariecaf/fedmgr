@@ -71,10 +71,13 @@ class StaticMetadata
     public function getMetadata($addNS=null)
     {
         $mresult = base64_decode($this->metadata);
+        
+$mresult = preg_replace('/\<\?xml(.*)\>/', '', $mresult);
 
 		if($addNS)
 		{
 			$top = '<EntitiesDescriptor 
+                                xmlns="urn:oasis:names:tc:SAML:2.0:metadata"
 				xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" 
 			 xmlns:ds="http://www.w3.org/2000/09/xmldsig#" 
                          xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
@@ -95,9 +98,9 @@ class StaticMetadata
 			$mresult = $top . $mresult .$down;
 
 		}
-		//return htmlspecialchars_decode($mresult);
 		return $mresult;
     }
+
 
 	public function getMetadataToDecoded()
 	{

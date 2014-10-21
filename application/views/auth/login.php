@@ -1,6 +1,5 @@
 <?php
 $base = base_url();
-$this->load->helper('form');
 $shib = $this->config->item('Shibboleth');
 $ssphp = $this->config->item('simplesamlphp');
 $fedenabled = FALSE;
@@ -51,7 +50,6 @@ else
         <div id="login_response"><!-- spanner --></div>
 
         <?php
-//echo form_open("auth/login", $attributes); 
         
         if ($fedenabled === TRUE)
         {

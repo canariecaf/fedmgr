@@ -25,6 +25,7 @@ class J_queue
     private $em;
     private $tmp_providers;
     private $tmp_federations;
+    private $attributesByName;
 
     function __construct()
     {
@@ -32,6 +33,11 @@ class J_queue
         $this->em = $this->ci->doctrine->em;
         $this->tmp_providers = new models\Providers;
         $this->tmp_federations = new models\Federations;
+        $attrs = $this->em->getRepository("models\Attribute")->findAll();
+        foreach($attrs as $a)
+        {
+            $this->attributesByName[''.$a->getOid().''] = $a;
+        }
     }
 
     /**
@@ -39,159 +45,278 @@ class J_queue
      * @param type $qid
      * @return string 
      */
-    function displayFormsButtons($qid)
+    function displayFormsButtons($qid, $onlycancel = FALSE)
     {
         /* add approve form */
-        $approve_hidden_attributes = array('qaction' => 'approve', 'qid' => $qid, 'setfederation' => 'yes');
-        $approve_attrid = array('id' => 'approvequeue');
-        $approve_form = form_open('reports/awaiting/approve', $approve_attrid, $approve_hidden_attributes);
-        $approve_form .= '<button type="submit" name="mysubmit" value="Accept request!" class="savebutton saveicon">' . lang("rr_submitapprove") . '</button>';
-        $approve_form .= form_close();
+        $rejecttext = lang('rr_submitreject');
+        if (!$onlycancel)
+        {
+            $approve_hidden_attributes = array('qaction' => 'approve', 'qid' => $qid, 'setfederation' => 'yes');
+            $approve_attrid = array('id' => 'approvequeue');
+            $approve_form = form_open('reports/awaiting/approve', $approve_attrid, $approve_hidden_attributes);
+            $approve_form .= '<button type="submit" name="mysubmit" value="Accept request!" class="savebutton saveicon right">' . lang('rr_submitapprove') . '</button>';
+            $approve_form .= form_close();
+        }
+        else
+        {
+            $approve_form = '';
+            $rejecttext = lang('rr_cancel');
+        }
         /* add reject form */
         $reject_hidden_attributes = array('qaction' => 'reject', 'qid' => $qid);
         $reject_attrid = array('id' => 'rejectqueue');
         $reject_form = form_open('reports/awaiting/reject', $reject_attrid, $reject_hidden_attributes);
-        $reject_form .= '<button type="submit" name="mysubmit" value="Reject request!" class="resetbutton reseticon">' . lang("rr_submitreject") . '</button>';
+        $reject_form .= '<button type="submit" name="mysubmit" value="Reject request!" class="resetbutton reseticon left alert">' . $rejecttext . '</button>';
         $reject_form .= form_close();
 
 
-        $result = '<div class="buttons" >' . $reject_form . '&nbsp;' . $approve_form . '</div>';
+        $result = '<div class="small-12 large-6 columns"><div class="buttons panel clearfix" >' . $reject_form . '' . $approve_form . '</div></div>';
         return $result;
     }
 
-
     function createUserFromQueue(models\Queue $q)
     {
-         $objdata = $q->getData();
-         if(!is_array($objdata))
-         {
-            log_message('error',__METHOD__.' data not in array');
+        $objdata = $q->getData();
+        if (!is_array($objdata))
+        {
+            log_message('error', __METHOD__ . ' data not in array');
             return false;
-         }
-         if(!isset($objdata['username']) || !isset($objdata['email']) || !isset($objdata['type']))
-         {
-            log_message('error',__METHOD__.' data doesnt contain information about username/email');
+        }
+        if (!isset($objdata['username']) || !isset($objdata['email']) || !isset($objdata['type']))
+        {
+            log_message('error', __METHOD__ . ' data doesnt contain information about username/email');
             return false;
-         }
-         $checkuser = $this->em->createQuery("SELECT u FROM models\User u WHERE u.username = '{$objdata['username']}' OR u.email = '{$objdata['email']}'")->getResult();
-         
- 
-         if($checkuser)
-         {
-             $this->ci->globalerrors[] = lang('useralredyregistered');
-             $this->ci->globalerrors[] = lang('queremoved');
-             log_message('error',__METHOD__. ' User '.$objdata['username'].' already exists, remove request from the queue with id: '.$q->getId());
-             $this->em->remove($q);
-             $this->em->flush();
-             return false;
-         }
-         $u = new models\User;
-         $u->setUsername($objdata['username']);
-         $u->setEmail($objdata['email']);
-         $type = $objdata['type'];
-         if($type === 'federated')
-         {
+        }
+        $checkuser = $this->em->createQuery("SELECT u FROM models\User u WHERE u.username = '{$objdata['username']}' OR u.email = '{$objdata['email']}'")->getResult();
+
+
+        if ($checkuser)
+        {
+            $this->ci->globalerrors[] = lang('useralredyregistered');
+            $this->ci->globalerrors[] = lang('queremoved');
+            log_message('error', __METHOD__ . ' User ' . $objdata['username'] . ' already exists, remove request from the queue with id: ' . $q->getId());
+            $this->em->remove($q);
+            $this->em->flush();
+            return false;
+        }
+        $u = new models\User;
+        $u->setUsername($objdata['username']);
+        $u->setEmail($objdata['email']);
+        $type = $objdata['type'];
+        if (strcmp($type, 'federated') == 0)
+        {
             $u->setFederatedEnabled();
-         }
-         else
-         {
+        }
+        else
+        {
             if ($type === 'local')
             {
-               $u->setLocalEnabled();
+                $u->setLocalEnabled();
             }
-            elseif($type === 'both')
+            elseif ($type === 'both')
             {
-               $u->setFederatedEnabled();
-               $u->setLocalEnabled();
+                $u->setFederatedEnabled();
+                $u->setLocalEnabled();
             }
-         }
-         $u->setAccepted();
+        }
+        $u->setAccepted();
 
-         if(!empty($objdata['fname']))
-         {
+        if (!empty($objdata['fname']))
+        {
             $u->setGivenname($objdata['fname']);
-         }
-         if(!empty($objdata['sname']))
-         {
+        }
+        if (!empty($objdata['sname']))
+        {
             $u->setSurname($objdata['sname']);
-         }
-         $u->setEnabled();         
-         $u->setSalt();
-         if(!empty($objdata['pass']))
-         {
+        }
+        $u->setEnabled();
+        $u->setSalt();
+        if (!empty($objdata['pass']))
+        {
             $u->setPassword($objdata['pass']);
-         }
-         else
-         {
+        }
+        else
+        {
             $u->setRandomPassword();
-         }
-       
-         $u->setValid();
-         $member = $this->em->getRepository("models\AclRole")->findOneBy(array('name' => 'Member'));
-         if (!empty($member)) {
-              $u->setRole($member);
-         }
-         $p_role = new models\AclRole;
-         $p_role->setName($u->getUsername());
-         $p_role->setType('user');
-         $p_role->setDescription('personal role for user ' . $u->getUsername());
-         $u->setRole($p_role);
-         $this->em->persist($p_role);
-         $this->em->persist($u);
-         return true;
-      // $this->em->flush();
+        }
 
-         
+        $u->setValid();
+        $member = $this->em->getRepository("models\AclRole")->findOneBy(array('name' => 'Member'));
+        if (!empty($member))
+        {
+            $u->setRole($member);
+        }
+        $p_role = new models\AclRole;
+        $p_role->setName($u->getUsername());
+        $p_role->setType('user');
+        $p_role->setDescription('personal role for user ' . $u->getUsername());
+        $u->setRole($p_role);
+        $this->em->persist($p_role);
+        $this->em->persist($u);
 
+        $m_subj = 'User Registration';
+        $m_body = 'Dear user,' . PHP_EOL;
+        $m_body .= 'User registration request to use the service ' . base_url() . ' has been accepted' . PHP_EOL;
+        $m_body .= 'Details:' . PHP_EOL;
+        $m_body .= 'Username: ' . $u->getUsername() . PHP_EOL;
+        $m_body .= 'E-mail: ' . $u->getEmail() . PHP_EOL;
+        $reciepient[] = $u->getEmail();
+        $this->ci->email_sender->addToMailQueue(array(), null, $m_subj, $m_body, $reciepient, $sync = false);
+        return true;
+    }
+
+    function displayApplyForEntityCategory(models\Queue $q)
+    {
+
+        $result['entityid'] = $q->getName();
+        $result['entcatid'] = $q->getRecipient();
+        $r = array();
+        $r[] = array('header' => lang('request'));
+
+        $r[] = array('name' => lang('type'), 'value' => lang('req_entcatapply'));
+        $creator = $q->getCreator();
+        if ($creator)
+        {
+            $r[] = array('name' => lang('requestor'), 'value' => $creator->getUsername());
+        }
+        else
+        {
+            $r[] = array('name' => lang('requestor'), 'value' => lang('unknown'));
+        }
+        $entityid = $q->getName();
+        $provider = $this->em->getRepository("models\Provider")->findOneBy(array('entityid' => $entityid));
+
+        if (!empty($provider))
+        {
+            $r[] = array('name' => lang('rr_provider'), 'value' => $entityid);
+        }
+        else
+        {
+
+            $r[] = array('name' => lang('rr_provider'), 'value' => $entityid . ' <span class="label alert">' . lang('prov_notexist') . '</span>');
+        }
+
+        $entcatid = $q->getRecipient();
+        $coc = $this->em->getRepository("models\Coc")->findOneBy(array('id' => $entcatid, 'type' => 'entcat'));
+        $cocenabled = $coc->getAvailable();
+        if ($cocenabled)
+        {
+            $lenabled = '';
+        }
+        else
+        {
+            $lenabled = '<span class="label alert">' . lang('rr_disabled') . '</span>';
+        }
+        if (empty($coc))
+        {
+            $r[] = array('name' => lang('entcat'), 'value' => '<div data-alert class="alert-box alert">' . lang('entcat_notexist') . '</div>');
+        }
+        else
+        {
+            $r[] = array('name' => lang('entcat'), 'value' => $lenabled . ' ' . $coc->getName() . ' ' . $coc->getUrl());
+        }
+        return $r;
+    }
+
+    function displayApplyForRegistrationPolicy(models\Queue $q)
+    {
+
+        $result['entityid'] = $q->getName();
+        $result['entcatid'] = $q->getRecipient();
+        $r = array();
+        $r[] = array('header' => lang('request'));
+
+        $r[] = array('name' => lang('type'), 'value' => lang('req_reqpolapply'));
+        $creator = $q->getCreator();
+        if ($creator)
+        {
+            $r[] = array('name' => lang('requestor'), 'value' => $creator->getUsername());
+        }
+        else
+        {
+            $r[] = array('name' => lang('requestor'), 'value' => lang('unknown'));
+        }
+        $entityid = $q->getName();
+        $provider = $this->em->getRepository("models\Provider")->findOneBy(array('entityid' => $entityid));
+
+        if (!empty($provider))
+        {
+            $r[] = array('name' => lang('rr_provider'), 'value' => $entityid);
+        }
+        else
+        {
+
+            $r[] = array('name' => lang('rr_provider'), 'value' => $entityid . ' <span class="label alert">' . lang('prov_notexist') . '</span>');
+        }
+
+        $entcatid = $q->getRecipient();
+        $coc = $this->em->getRepository("models\Coc")->findOneBy(array('id' => $entcatid, 'type' => 'regpol'));
+        $cocenabled = $coc->getAvailable();
+        if ($cocenabled)
+        {
+            $lenabled = '';
+        }
+        else
+        {
+            $lenabled = '<span class="label alert">' . lang('rr_disabled') . '</span>';
+        }
+        if (empty($coc))
+        {
+            $r[] = array('name' => lang('rr_regpolicy'), 'value' => '<div data-alert class="alert-box alert">' . lang('regpol_notexist') . '</div>');
+        }
+        else
+        {
+            $r[] = array('name' => lang('rr_regpolicy'), 'value' => '<span class="label info">' . $coc->getLang() . '</span> ' . $coc->getName() . ': ' . $coc->getUrl() . ' ' . $lenabled);
+        }
+        return $r;
     }
 
     function displayRegisterUser(models\Queue $q)
     {
-       $objdata = $q->getData();
-       $r = array();
-       $r[] = array('header'=>lang('request'));
-       $r[] = array('name'=>lang('type'), 'value'=>'user registration');
-       $creator = $q->getCreator();
-       if ($creator) {
-           $r[] = array('name' => lang('requestor'), 'value' => $creator->getUsername());
-       }
-       else {
-           $r[] = array('name' => lang('requestor'), 'value' => lang('unknown'));
-       }
-       $r[] = array('name' => lang('rr_regdate'), 'value' => $q->getCreatedAt());
-       $r[] = array('name' => lang('rr_username'), 'value' => $q->getName());
-       $r[] = array('name' => lang('rr_uemail'), 'value' => $objdata['email']);
-       $r[] = array('name' => lang('rr_fname'), 'value' => $objdata['fname']);
-       $r[] = array('name' => lang('rr_lname'), 'value' => $objdata['sname']);
-       if(isset($objdata['ip']))
-       {
-          $r[] = array('name' => 'IP', 'value' => $objdata['ip']);
-       }
-       if(isset($objdata['type']))
-       {
-          if($objdata['type'] === 'federated')
-          {
-            $r[] = array('name' => 'Type of account', 'value' => ''.lang('rr_onlyfedauth').'');
-          }
-          elseif($objdata['type'] === 'local')
-          {
-            $r[] = array('name' => 'Type of account', 'value' => ''.lang('rr_onlylocalauthn').'');
+        $objdata = $q->getData();
+        $r = array();
+        $r[] = array('header' => lang('request'));
+        $r[] = array('name' => lang('type'), 'value' => lang('req_userregistration'));
+        $creator = $q->getCreator();
+        if ($creator)
+        {
+            $r[] = array('name' => lang('requestor'), 'value' => $creator->getUsername());
+        }
+        else
+        {
+            $r[] = array('name' => lang('requestor'), 'value' => lang('unknown'));
+        }
+        $r[] = array('name' => lang('rr_regdate'), 'value' => $q->getCreatedAt());
+        $r[] = array('name' => lang('rr_username'), 'value' => $q->getName());
+        $r[] = array('name' => lang('rr_uemail'), 'value' => $objdata['email']);
+        $r[] = array('name' => lang('rr_fname'), 'value' => $objdata['fname']);
+        $r[] = array('name' => lang('rr_lname'), 'value' => $objdata['sname']);
+        if (isset($objdata['ip']))
+        {
+            $r[] = array('name' => 'IP', 'value' => $objdata['ip']);
+        }
+        if (isset($objdata['type']))
+        {
+            if ($objdata['type'] === 'federated')
+            {
+                $r[] = array('name' => 'Type of account', 'value' => '' . lang('rr_onlyfedauth') . '');
+            }
+            elseif ($objdata['type'] === 'local')
+            {
+                $r[] = array('name' => 'Type of account', 'value' => '' . lang('rr_onlylocalauthn') . '');
+            }
+            elseif ($objdata['type'] === 'both')
+            {
+                $r[] = array('name' => 'Type of account', 'value' => '' . lang('rr_bothauth') . '');
+            }
+            else
+            {
+                $r[] = array('name' => 'Type of account', 'value' => '<span class="alert">' . lang('unknown') . '</span>');
+            }
+        }
 
-          }
-          elseif($objdata['type'] === 'both')
-          {
-            $r[] = array('name' => 'Type of account', 'value' => ''.lang('rr_bothauth').'');
-          }
-          else
-          {
-            $r[] = array('name' => 'Type of account', 'value' => '<span class="alert">'.lang('unknown').'</span>');
 
-          }
-       }
-      
-       
-       return $r;
-
+        return $r;
     }
 
     function displayRegisterFederation(models\Queue $q)
@@ -207,23 +332,25 @@ class J_queue
         $fedrows[] = array('name' => lang('type'), 'value' => lang('reqregnewfed'));
 
         $creator = $q->getCreator();
-        if ($creator) {
+        if ($creator)
+        {
             $fedrows[] = array('name' => lang('requestor'), 'value' => $creator->getUsername());
-            $objData->setOwner($creator->getUsername());
         }
-        else {
+        else
+        {
             $fedrows[] = array('name' => lang('requestor'), 'value' => lang('unknown'));
         }
 
         $fedrows[] = array('name' => lang('rr_regdate'), 'value' => $q->getCreatedAt());
         $fedrows[] = array('header' => lang('rr_basicinformation'));
         $fedrows[] = array('name' => lang('rr_fed_name'), 'value' => $objData->getName());
-        $fedrows[] = array('name' => lang('rr_fed_urn'), 'value' => $objData->getUrn());
+        $fedrows[] = array('name' => lang('fednameinmeta'), 'value' => $objData->getUrn());
         $fedrows[] = array('name' => lang('Description'), 'value' => $objData->getDescription());
         $fedrows[] = array('name' => lang('rr_fed_tou'), 'value' => $objData->getTou());
 
         return $fedrows;
     }
+
     function displayDeleteFederation(models\Queue $q)
     {
         $objData = new models\Federation;
@@ -237,106 +364,255 @@ class J_queue
         $fedrows[] = array('name' => lang('type'), 'value' => lang('reqdelfed'));
 
         $creator = $q->getCreator();
-        if ($creator) {
+        if ($creator)
+        {
             $fedrows[] = array('name' => lang('requestor'), 'value' => $creator->getUsername());
-            $objData->setOwner($creator->getUsername());
         }
-        else {
+        else
+        {
             $fedrows[] = array('name' => lang('requestor'), 'value' => lang('unknown'));
         }
 
         $fedrows[] = array('name' => lang('rr_requestdate'), 'value' => $q->getCreatedAt());
         $fedrows[] = array('header' => lang('rr_basicinformation'));
         $fedrows[] = array('name' => lang('rr_fed_name'), 'value' => $objData->getName());
-        $fedrows[] = array('name' => lang('rr_fed_urn'), 'value' => $objData->getUrn());
+        $fedrows[] = array('name' => lang('fednameinmeta'), 'value' => $objData->getUrn());
 
         return $fedrows;
     }
 
     function displayRegisterProvider(models\Queue $q)
     {
+        $showXML = FALSE;
         $objData = null;
         $data = $q->getData();
         $objType = $q->getObjType();
         $objData = new models\Provider;
-        $objData->importFromArray($data);
+        if (!isset($data['metadata']))
+        {
+            $objData->importFromArray($data);
+        }
+        else
+        {
+            $metadataXml = base64_decode($data['metadata']);
+            $this->ci->load->library('xmlvalidator');
+            libxml_use_internal_errors(true);
+            $metadataDOM = new \DOMDocument();
+            $metadataDOM->strictErrorChecking = FALSE;
+            $metadataDOM->WarningChecking = FALSE;
+            $metadataDOM->loadXML($metadataXml);
+            $isValid = $this->ci->xmlvalidator->validateMetadata($metadataDOM, FALSE, FALSE);
+            if (!$isValid)
+            {
+                log_message('error', __METHOD__ . ' invalid metadata in the queue ');
+            }
+            else
+            {
+                $this->ci->load->library('metadata2array');
+                $xpath = new DomXPath($metadataDOM);
+                $namespaces = h_metadataNamespaces();
+                foreach ($namespaces as $key => $value)
+                {
+                    $xpath->registerNamespace($key, $value);
+                }
+                $domlist = $metadataDOM->getElementsByTagName('EntityDescriptor');
+                if (count($domlist) == 1)
+                {
+                    $d = array();
+                    foreach ($domlist as $l)
+                    {
+                        $entarray = $this->ci->metadata2array->entityDOMToArray($l, TRUE);
+                    }
+                    $objData = new models\Provider;
+                    $objData->setProviderFromArray(current($entarray), TRUE);
+                    $objData->setReqAttrsFromArray(current($entarray),$this->attributesByName);
+                    $metadataXML = $this->ci->providertoxml->entityConvertNewDocument($objData, array('attrs'=>1), true);
+                    $showXML = TRUE;
+                }
+            }
+        }
         $i = 0;
-        $provider[$i++]['header'] = lang('rr_basicinformation');
-        $provider[$i]['name'] = lang('rr_homeorganisationname');
-        $provider[$i++]['value'] = $objData->getName();
+        $feds = $objData->getFederations();
+        $fedIdsCollection = array();
 
-        $provider[$i]['name'] = 'entityID';
+        $dataRows[$i++]['header'] = lang('rr_fedstojoin');
+        if ($feds->count() > 0)
+        {
 
-        $provider[$i++]['value'] = $objData->getEntityId();
+            foreach ($objData->getFederations() as $fed)
+            {
+                $realFed = $this->em->getRepository("models\Federation")->findOneBy(array('sysname' => $fed->getSysname()));
+                if (!empty($realFed))
+                {
+                    $fedIdsCollection[] = $realFed->getId();
+                }
+                $dataRows[$i]['name'] = lang('rr_federation');
+                $dataRows[$i]['value'] = $fed->getName();
+                $i++;
+            }
+        }
+        elseif (isset($data['federations']))
+        {
+            foreach ($data['federations'] as $f)
+            {
+                $p = $this->em->getRepository("models\Federation")->findOneBy(array('sysname' => $f['sysname']));
+                if (!empty($p))
+                {
+                    $fedIdsCollection[] = $p->getId();
+
+                    $dataRows[$i]['name'] = lang('rr_federation');
+                    $dataRows[$i]['value'] = $p->getName();
+                    $i++;
+                }
+            }
+        }
+        else
+        {
+            $dataRows[$i++] = array('name' => '','value' => lang('noneatthemoment'));
+        }
+        
+        /**
+         * @todo show all fedvalidators which are assigned to federations
+         */
+        $valMandatory = null;
+        $valOptional = null;
+        $attrs = array('id' => 'fvform', 'style' => 'display: inline', 'class' => '');
+        if (count($fedIdsCollection) > 0)
+        {
+            $validators = $this->em->getRepository("models\FederationValidator")->findBy(array('federation' => $fedIdsCollection, 'isEnabled' => true));
+            foreach ($validators as $v)
+            {
+                if ($v->getMandatory())
+                {
+                    $hidden = array('fedid' => $v->getFederation()->getId(), 'qtoken' => $q->getToken(), 'fvid' => $v->getId());
+                    $valMandatory .= form_open(base_url() . 'federations/fvalidator/validate', $attrs, $hidden);
+                    $valMandatory .= '<button id="' . $v->getId() . '" title="' . $v->getDescription() . '">' . $v->getName() . '</button> ';
+                    $valMandatory .= form_close();
+                }
+                else
+                {
+                    $hidden = array('fedid' => $v->getFederation()->getId(), 'qtoken' => $q->getToken(), 'fvid' => $v->getId());
+                    $valOptional .= form_open(base_url() . 'federations/fvalidator/validate', $attrs, $hidden);
+                    $valOptional .= '<button id="' . $v->getId() . '" title="' . $v->getDescription() . '">' . $v->getName() . '</button> ';
+                    $valOptional .= form_close();
+                }
+            }
+            $dataRows[$i++] = array('name' => lang('manValidator'),'value' => $valMandatory);
+            $dataRows[$i++] = array('name' => lang('optValidator'),'value' => $valOptional);
+            $resultValidation = '<div id="fvresult" style="display:none;" data-alert class="alert-box info"><div><b>' . lang('fvalidcodereceived') . '</b>: <span id="fvreturncode"></span></div><div><p><b>' . lang('fvalidmsgsreceived') . '</b>:</p><div id="fvmessages"></div></div></div>';
+            $resultValidation .= '<div id="fvalidesc"></div>';
+            $dataRows[$i++] = array('2cols'=>$resultValidation);
+        }
+
+
+
+        $dataRows[$i++]['header'] = lang('rr_basicinformation');
+        $dataRows[$i]['name'] = lang('rr_homeorganisationname');
+        $dataRows[$i++]['value'] = $objData->getName();
+
+        $dataRows[$i]['name'] = 'entityID';
+
+        $dataRows[$i++]['value'] = $objData->getEntityId();
         $type = $objData->getType();
-        if ($type === 'IDP') {
-            $provider[$i]['name'] = lang('type');
-            $provider[$i++]['value'] = lang('identityprovider');
+        if ($type === 'IDP')
+        {
+            $dataRows[$i]['name'] = lang('type');
+            $dataRows[$i++]['value'] = lang('identityprovider');
 
-            $provider[$i]['name'] = lang('rr_scope').' <br /><small>IDPSSODescriptor</small>';
-            $provider[$i++]['value'] = implode(';',$objData->getScope('idpsso'));
+            $dataRows[$i]['name'] = lang('rr_scope') . ' <br /><small>IDPSSODescriptor</small>';
+            $dataRows[$i++]['value'] = implode(';', $objData->getScope('idpsso'));
         }
-        elseif ($type === 'SP') {
-            $provider[$i]['name'] = lang('type');
-            $provider[$i++]['value'] = lang('serviceprovider');
+        elseif ($type === 'SP')
+        {
+            $dataRows[$i]['name'] = lang('type');
+            $dataRows[$i++]['value'] = lang('serviceprovider');
         }
-        $provider[$i]['name'] = lang('rr_homeurl');
-        $provider[$i++]['value'] = $objData->getHomeUrl();
 
-        $provider[$i]['name'] = lang('rr_helpdeskurl');
-        $provider[$i++]['value'] = $objData->getHelpdeskUrl();
+        $dataRows[$i]['name'] = lang('rr_helpdeskurl');
+        $dataRows[$i++]['value'] = $objData->getHelpdeskUrl();
 
-        foreach ($objData->getFederations() as $fed) {
-            $provider[$i]['name'] = lang('rr_federation');
-            $provider[$i]['value'] = $fed->getName();
+
+        $dataRows[$i++]['header'] = lang('rr_servicelocations');
+        $servicetypesWithIndex = array('IDPArtifactResolutionService', 'DiscoveryResponse', 'AssertionConsumerService', 'SPArtifactResolutionService');
+        foreach ($objData->getServiceLocations() as $service)
+        {
+            $serviceType = $service->getType();
+            $dataRows[$i]['name'] = $serviceType;
+            if (in_array($serviceType, $servicetypesWithIndex))
+            {
+                $orderString = 'index: ' . $service->getOrder();
+            }
+            else
+            {
+                $orderString = '';
+            }
+            $dataRows[$i]['value'] = "" . $service->getUrl() . "<br /><small>" . $service->getBindingName() . " " . $orderString . " </small><br />";
             $i++;
         }
-        $provider[$i++]['header'] = lang('rr_servicelocations');
-        foreach ($objData->getServiceLocations() as $service) {
-            $provider[$i]['name'] = $service->getType();
-            $provider[$i]['value'] = "" . $service->getUrl() . "<br /><small>" . $service->getBindingName() . " ; index: ".$service->getOrder()."</small><br />";
-            $i++;
-        }
-        $provider[$i++]['header'] = lang('rr_supportednameids');
-        $provider[$i]['name'] = lang('nameid');
-        if($type === 'IDP')
+        $dataRows[$i++]['header'] = lang('rr_supportednameids');
+        $dataRows[$i]['name'] = lang('nameid');
+        if ($type === 'IDP')
         {
-          $provider[$i++]['value'] = implode(', ', $objData->getNameIds('idpsso'));
+            $dataRows[$i++]['value'] = implode(', ', $objData->getNameIds('idpsso'));
         }
-        elseif($type ==='SP')
+        elseif ($type === 'SP')
         {
-            $provider[$i++]['value'] = implode(', ', $objData->getNameIds('spsso'));
+            $dataRows[$i++]['value'] = implode(', ', $objData->getNameIds('spsso'));
         }
 
 
 
-        $provider[$i++]['header'] = lang('rr_certificates');
-        foreach ($objData->getCertificates() as $cert) {
-            $provider[$i]['name'] = "Certificate (" . $cert->getCertUse() . ")";
+        $dataRows[$i++]['header'] = lang('rr_certificates');
+        foreach ($objData->getCertificates() as $cert)
+        {
+            $dataRows[$i]['name'] = "Certificate (" . $cert->getCertUse() . ")";
             $certdatacell = reformatPEM($cert->getCertdata());
 
 
-            $provider[$i]['value'] = "<span class=\"span-10\"><code>" . $certdatacell . "</code></span>";
+            $dataRows[$i]['value'] = "<span class=\"span-10\"><code>" . $certdatacell . "</code></span>";
             $i++;
         }
 
-        $provider[$i++]['header'] = lang('rr_contacts');
-        foreach ($objData->getContacts() as $contact) {
-            $provider[$i]['name'] = lang('rr_contact') . ' (' . $contact->getType() . ')';
-            $provider[$i]['value'] = $contact->getFullName() . " &lt;" . $contact->getEmail() . "&gt;";
+        $dataRows[$i++]['header'] = lang('rr_contacts');
+        foreach ($objData->getContacts() as $contact)
+        {
+            $phone = $contact->getPhone();
+            if (!empty($phone))
+            {
+                $phoneStr = 'Tel:' . $phone;
+            }
+            else
+            {
+                $phoneStr = '';
+            }
+            $dataRows[$i]['name'] = lang('rr_contact') . ' (' . $contact->getType() . ')';
+            $dataRows[$i]['value'] = $contact->getFullName() . " &lt;" . $contact->getEmail() . "&gt; " . $phoneStr;
             $i++;
         }
-        return $provider;
+        if ($showXML)
+        {
+            $params = array(
+                'enable_classes' => true,
+            );
+
+            $dataRows[$i]['name'] = 'XML';
+            $this->ci->load->library('geshilib');
+            $dataRows[$i]['value'] = '' . $this->ci->geshilib->highlight($metadataXML, 'xml', $params) . '';
+            $i++;
+        }
+        return $dataRows;
     }
 
     function displayInviteProvider(models\Queue $queue)
     {
 
         $this->ci->load->library('table');
-        if ($queue->getRecipientType() == 'provider') {
+        if ($queue->getRecipientType() == 'provider')
+        {
             $provider = $this->tmp_providers->getOneById($queue->getRecipient());
         }
-        if (empty($provider)) {
+        if (empty($provider))
+        {
             return false;
         }
         $tmpl = array('table_open' => '<table id="details" class="zebra">');
@@ -367,15 +643,18 @@ class J_queue
         return $result;
     }
 
-    function displayInviteFederation(models\Queue $queue)
+    function displayInviteFederation(models\Queue $queue, $canApprove = false)
     {
 
         $this->ci->load->library('table');
-        if ($queue->getRecipientType() == 'federation') {
+        $recipientType = $queue->getRecipientType();
+        if (strcasecmp($recipientType, 'federation') == 0)
+        {
             $federation = $this->tmp_federations->getOneFederationById($queue->getRecipient());
         }
-        if (empty($federation)) {
-            \log_message('error',__METHOD__.' Federation ('.$queue->getRecipient().') does not exist anymore');
+        if (empty($federation))
+        {
+            \log_message('error', __METHOD__ . ' Federation (' . $queue->getRecipient() . ') does not exist anymore');
             return false;
         }
         $tmpl = array('table_open' => '<table id="details" class="zebra">');
@@ -393,16 +672,16 @@ class J_queue
         $this->ci->table->add_row($cell);
         $validators = $federation->getValidators();
         $fedValidator = null;
-        foreach($validators as $v)
+        foreach ($validators as $v)
         {
             $g = $v->getEnabled();
-            if($g)
+            if ($g)
             {
                 $fedValidator = $v;
                 break;
             }
         }
-        if($fedValidator)
+        if ($fedValidator)
         {
             $nname = $fedValidator->getName();
         }
@@ -410,7 +689,37 @@ class J_queue
         {
             $nname = '';
         }
-        $cell = array(lang('rr_federation'), $federation->getName() . ' '.$nname);
+        $data = $queue->getData();
+        $provider = $this->em->getRepository("models\Provider")->findOneBy(array('entityid' => $data['entityid']));
+        $validators = $federation->getValidators();
+        $valMandatory = null;
+        $valOptional = null;
+        $attrs = array('id' => 'fvform', 'style' => 'display: inline', 'class' => '');
+        foreach ($validators as $v)
+        {
+            if ($v->getEnabled())
+            {
+                if ($v->getMandatory())
+                {
+                    $hidden = array('fedid' => $federation->getId(), 'provid' => $provider->getId(), 'fvid' => $v->getId());
+                    $valMandatory .= form_open(base_url() . 'federations/fvalidator/validate', $attrs, $hidden);
+                    $valMandatory .= '<button id="' . $v->getId() . '" title="' . $v->getDescription() . '">' . $v->getName() . '</button> ';
+                    $valMandatory .= form_close();
+                }
+                else
+                {
+                    $hidden = array('fedid' => $federation->getId(), 'provid' => $provider->getId(), 'fvid' => $v->getId());
+                    $valOptional .= form_open(base_url() . 'federations/fvalidator/validate', $attrs, $hidden);
+                    $valOptional .= '<button id="' . $v->getId() . '" title="' . $v->getDescription() . '">' . $v->getName() . '</button> ';
+                    $valOptional .= form_close();
+                }
+            }
+        }
+        $cell = array(lang('manValidator'), $valMandatory);
+        $this->ci->table->add_row($cell);
+        $cell = array(lang('optValidator'), $valOptional);
+        $this->ci->table->add_row($cell);
+        $cell = array(lang('rr_federation'), $federation->getName() . ' ');
         $this->ci->table->add_row($cell);
         $data = $queue->getData();
         $cell = array(lang('rr_provider'), $data['name']);
@@ -418,12 +727,17 @@ class J_queue
         $cell = array(lang('request'), lang('acceptprovtofed'));
         $this->ci->table->add_row($cell);
 
-        if(isset($data['message']))
+        if (isset($data['message']))
         {
             $cell = array(lang('rr_message'), $data['message']);
             $this->ci->table->add_row($cell);
         }
-        $cell = array('data' => $this->displayFormsButtons($queue->getId()), 'colspan' => 2);
+        $cell = array('data' => $this->displayFormsButtons($queue->getId(), !$canApprove), 'colspan' => 2);
+        $this->ci->table->add_row($cell);
+        # show additional information returned by validator
+        $text = '<div id="fvresult" style="display:none;" data-alert class="alert-box info"><div><b>' . lang('fvalidcodereceived') . '</b>: <span id="fvreturncode"></span></div><div><p><b>' . lang('fvalidmsgsreceived') . '</b>:</p><div id="fvmessages"></div></div></div>';
+        $text .= '<div id="fvalidesc"></div>';
+        $cell = array('data' => $text, 'colspan' => 2);
         $this->ci->table->add_row($cell);
         $result = '';
         $result .= $this->ci->table->generate();

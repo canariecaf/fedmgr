@@ -33,21 +33,31 @@ class Sync_metadata extends CI_Controller {
     {
         $this->output->set_content_type('text/plain');
         $baseurl = base_url();
+        $digestmethod = $this->config->item('signdigest');
+        if(empty($digestmethod))
+        {
+           $digestmethod = 'SHA-1';
+        }
         $result = array();
         if (empty($i))
         {
             $federations = $this->em->getRepository("models\Federation")->findAll();
-            if (!empty($federations))
+            foreach ($federations as $f)
             {
-                foreach ($federations as $f)
+                $digest = $f->getDigest();
+                if(empty($digest))
                 {
-                    $url = $baseurl . "metadata/federation/" . base64url_encode($f->getName()) . "/metadata.xml";
-                    $result[] = array('group' => 'federation', 'name' => base64url_encode($f->getName()), 'url' => $url);
-                    if ($f->getLocalExport() === TRUE)
+                   $digest = $digestmethod;
+                }
+                $result[] = array('group' => 'federation', 'name' => $f->getSysname(), 'url' => ''.$baseurl . 'metadata/federation/' . $f->getSysname() . '/metadata.xml','digest'=>$digest);
+                if ($f->getLocalExport() === TRUE)
+                {
+                    $digestEx = $f->getDigestExport();
+                    if(empty($digestEx))
                     {
-                        $url = $baseurl . "metadata/federationexport/" . base64url_encode($f->getName()) . "/metadata.xml";
-                        $result[] = array('group' => 'federationexport', 'name' => base64url_encode($f->getName()), 'url' => $url);
+                      $digestEx = $digestmethod;
                     }
+                    $result[] = array('group' => 'federationexport', 'name' => $f->getSysname(), 'url' => ''.$baseurl . 'metadata/federationexport/' . $f->getSysname() . '/metadata.xml','digest'=>$digestEx);
                 }
             }
             $disableexternalcirclemeta = $this->config->item('disable_extcirclemeta');
@@ -62,18 +72,19 @@ class Sync_metadata extends CI_Controller {
         {
             $providers = $this->em->getRepository("models\Provider")->findBy(array('entityid' => base64url_decode($i)));
         }
-        if (!empty($providers))
+        foreach ($providers as $p)
         {
-            foreach ($providers as $p)
+            $digest = $p->getDigest();
+            if(empty($digest))
             {
-                $url = $baseurl . "metadata/circle/" . base64url_encode($p->getEntityId()) . "/metadata.xml";
-                $result[] = array('group' => 'provider', 'name' => base64url_encode($p->getEntityId()), 'url' => $url);
+                $digest = $digestmethod;
             }
+            $result[] = array('group' => 'provider', 'name' => base64url_encode($p->getEntityId()), 'url' => ''.$baseurl . 'metadata/circle/' . base64url_encode($p->getEntityId()) . '/metadata.xml','digest'=>$digest);
         }
         $out = "";
         foreach ($result as $r)
         {
-            $out .= $r['group'] . ";" . $r['name'] . ";" . $r['url'] . "\n";
+            $out .= $r['group'] . ";" . $r['name'] . ";" . $r['url'] . ";".$r['digest'].PHP_EOL;
         }
 
         $this->output->set_output($out);
@@ -96,10 +107,19 @@ class Sync_metadata extends CI_Controller {
     public function semiautomatic($syncpass, $encoded_url, $encoded_federationurn, $conditions_to_set = null)
     {
 
-        $protectpass = $this->config->item('syncpass');
-        if ($protectpass != $syncpass)
+        $featenabled = $this->config->item('featdisable');
+        if(!empty($featenabled) && is_array($featenabled) && isset($featenabled['metasync']))
         {
-            show_error('Access Denied - invalid token', 403);
+           set_status_header(403);
+           echo 'Denied';
+           return;
+        }
+
+        $protectpass = $this->config->item('syncpass');
+        if (empty($protectpass) || strlen($protectpass)<10 ||  strcmp($protectpass, $syncpass) !=0)
+        {
+            set_status_header(403);
+            echo 'Access Denied - invalid token';
             return;
         }
         $conditions_default = array(
@@ -113,12 +133,6 @@ class Sync_metadata extends CI_Controller {
             'mailreport'=>false,
             'email'=>null,
         );
-//		$cli = $this->input->is_cli_request();
-//		if(empty($cli))
-//		{
-//			show_error('Access Denied',403);
-//			return;
-//		}
         $conditions_in_array = array();
         if (!empty($conditions_to_set))
         {
@@ -126,7 +140,6 @@ class Sync_metadata extends CI_Controller {
         }
         $conditions = array_merge($conditions_default, $conditions_in_array);
 
-        //print_r($conditions);
 
         $url = base64url_decode($encoded_url);
         $federationurn = base64url_decode($encoded_federationurn);

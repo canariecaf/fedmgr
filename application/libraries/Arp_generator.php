@@ -40,7 +40,8 @@ class Arp_generator {
         if ($byInherit)
         {
             $res = $this->ci->j_cache->library('arp_generator', 'arpToArrayByInherit', array($idp_id), $this->ci->config->item('arp_cache_time'));
-        } else
+        }
+        else
         {
             $res = $this->ci->j_cache->library('arp_generator', 'arpToArray', array($idp_id), $this->ci->config->item('arp_cache_time'));
         }
@@ -70,7 +71,8 @@ class Arp_generator {
                 $c = $result->createComment(str_replace('--', '-' . chr(194) . chr(173) . '-', $comment));
                 $AttributeFilterPolicyGroup->appendChild($c);
             }
-        } else
+        }
+        else
         {
             $this->ci->j_cache->library('arp_generator', 'arpToArray', array($idp_id), -1);
         }
@@ -133,7 +135,6 @@ class Arp_generator {
                 foreach ($value['attributes'] as $attr_name => $attr_value)
                 {
                     log_message('debug', 'generating arpXML attr: ' . $attr_name . ' for:' . $key);
-                    //log_message('debug', 'keys are:' . implode(";", array_keys($value)) . ' for:' . $key);
                     if (array_key_exists($attr_name, $value['custom']) && $attr_value == 1)
                     {
                         log_message('debug', 'found custom for attr: ' . $attr_name . ' for:' . $key);
@@ -158,7 +159,8 @@ class Arp_generator {
 
                                 $AttributeRule->appendChild($PermitValueRule);
                                 $AttributeFilterPolicy->appendChild($AttributeRule);
-                            } else
+                            }
+                            else
                             {
                                 $PermitValueRule = $docXML->CreateElementNS('urn:mace:shibboleth:2.0:afp', 'PermitValueRule');
                                 $PermitValueRule->setAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'xsi:type', 'basic:AttributeValueString');
@@ -188,7 +190,8 @@ class Arp_generator {
 
                                 $AttributeRule->appendChild($DenyValueRule);
                                 $AttributeFilterPolicy->appendChild($AttributeRule);
-                            } else
+                            }
+                            else
                             {
                                 $DenyValueRule = $docXML->CreateElementNS('urn:mace:shibboleth:2.0:afp', 'DenyValueRule');
                                 $DenyValueRule->setAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'xsi:type', 'basic:AttributeValueString');
@@ -199,7 +202,8 @@ class Arp_generator {
                                 $AttributeFilterPolicy->appendChild($AttributeRule);
                             }
                         }
-                    } else
+                    }
+                    else
                     {
                         if ($attr_value == 0)
                         {
@@ -209,7 +213,8 @@ class Arp_generator {
                             $PermitValueRule->setAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'xsi:type', 'basic:ANY');
                             $AttributeFilterPolicy->appendChild($AttributeRule);
                             $AttributeRule->appendChild($PermitValueRule);
-                        } elseif ($attr_value == 1)
+                        }
+                        elseif ($attr_value == 1)
                         {
                             $AttributeRule = $docXML->CreateElementNS('urn:mace:shibboleth:2.0:afp', 'AttributeRule');
                             $AttributeRule->setAttribute('attributeID', $attr_name);
@@ -234,10 +239,12 @@ class Arp_generator {
         if (empty($idp_id))
         {
             $idp = $this->idp;
-        } elseif ($provider instanceOf models\Provider)
+        }
+        elseif ($provider instanceOf models\Provider)
         {
             $idp = $provider;
-        } elseif (is_numeric($provider) && !empty($this->idp))
+        }
+        elseif (is_numeric($provider) && !empty($this->idp))
         {
             $tmp_id = $this->idp->getId();
             if ($tmp_id == $provider)
@@ -262,9 +269,9 @@ class Arp_generator {
         foreach ($tmp_myfeds as $t)
         {
             $fedEnabled = $t->getActive();
-            if($fedEnabled)
+            if ($fedEnabled)
             {
-              $feds_collection[$t->getId()] = $t->getActiveMembers();
+                $feds_collection[$t->getId()] = $t->getActiveMembers();
             }
         }
         $tmp_requirements = new models\AttributeRequirements;
@@ -281,12 +288,11 @@ class Arp_generator {
             foreach ($tmpexl as $tmpv)
             {
                 $excludedById[] = $tmpv->getId();
-                if($members->contains($tmpv))
+                if ($members->contains($tmpv))
                 {
-                   $members->removeElement($tmpv);
+                    $members->removeElement($tmpv);
                 }
             }
-
         }
         log_message('debug', 'excluded SP from arp by id:' . serialize($excludedById));
 
@@ -297,7 +303,8 @@ class Arp_generator {
 
                 $members_byid[$m_value->getId()] = $m_value;
             }
-        } else
+        }
+        else
         {
             log_message('debug', 'no members found');
             return null;
@@ -334,27 +341,28 @@ class Arp_generator {
                 {
                     $sp_entityid = $sp_requester->getEntityId();
                     $custom_policies[$sp_entityid][$key->getAttribute()->getName()] = $key->getRawdata();
-                } else
+                }
+                else
                 {
                     log_message('warning', 'Found orphaned or requester SP is disabled: custom policy with id:' . $key->getId());
                 }
             }
         }
         $specific_attributes = array();
-        $t_sp = new models\Providers;
         $spec_attrs = $tmp_s_attrs->getSpecificPolicyAttributes($idp);
         if (!empty($spec_attrs))
         {
             foreach ($spec_attrs as $skey => $svalue)
             {
-                //$ent = $t_sp->getOneById($svalue->getRequester());
                 if (isset($members_byid[$svalue->getRequester()]))
                 {
                     $ent = $members_byid[$svalue->getRequester()];
-                } elseif (!in_array($svalue->getRequester(), $excludedById))
+                }
+                elseif (!in_array($svalue->getRequester(), $excludedById))
                 {
                     log_message('warning', 'found orphaned arps in db : sprequest:' . $svalue->getRequester() . ' doesn exist in provider table - SP might be disabled');
-                } else
+                }
+                else
                 {
                     log_message('debug', 'sprequest:' . $svalue->getRequester() . ' is excluded from arp not generating');
                 }
@@ -377,7 +385,7 @@ class Arp_generator {
         {
             $global_policy[$g->getAttribute()->getName()] = $g->getPolicy();
         }
-        if (empty($s_attrs) or (is_array($s_attrs) && count($s_attrs) == 0))
+        if (empty($s_attrs) || (is_array($s_attrs) && count($s_attrs) == 0))
         {
             log_message('debug', 'Arp:  no supported attributes for idp: ' . $idp->getId());
             return null;
@@ -392,7 +400,8 @@ class Arp_generator {
             if (array_key_exists($k, $global_policy))
             {
                 $m_policy[$k] = $global_policy[$k];
-            } else
+            }
+            else
             {
                 $m_policy[$k] = 0;
             }
@@ -421,7 +430,8 @@ class Arp_generator {
                                 {
                                     $attrs[$m->getEntityId()][$atkey] = $federation_policy[$key][$atkey];
                                 }
-                            } else
+                            }
+                            else
                             {
                                 $attrs[$m->getEntityId()][$atkey] = 0;
                             }
@@ -430,8 +440,6 @@ class Arp_generator {
                 }
             }
         }
-        $i = 0;
-
         foreach ($specific_attributes as $pkey => $pvalue)
         {
 
@@ -442,7 +450,8 @@ class Arp_generator {
                     if (array_key_exists($kattr, $specific_attributes[$pkey]))
                     {
                         $attrs[$pkey][$kattr] = $specific_attributes[$pkey][$kattr];
-                    } else
+                    }
+                    else
                     {
                         $attrs[$pkey][$kattr] = 0;
                     }
@@ -483,21 +492,23 @@ class Arp_generator {
                         if ($req_value == 'required' && ($rel_value > 0))
                         {
                             $release[$m_entityid]['attributes'][$attr_name] = 1;
-                        } elseif ($rel_value == 2)
+                        }
+                        elseif ($rel_value == 2)
                         {
                             $release[$m_entityid]['attributes'][$attr_name] = 1;
-                        } else
+                        }
+                        else
                         {
                             $release[$m_entityid]['attributes'][$attr_name] = 0;
                         }
                     }
                 }
-            } else
+            }
+            else
             {
                 $feds_1 = $m->getActiveFederations();
                 if (!empty($feds_1))
                 {
-                    $tmp_fed_req = array();
                     foreach ($feds_1->getValues() as $f_key => $f_value)
                     {
                         /* check if sp's federation matches idp federation */
@@ -522,13 +533,15 @@ class Arp_generator {
                                         if ($req_value == 'required' && ($rel_value > 0))
                                         {
                                             $release[$m->getEntityId()]['attributes'][$attr_name] = 1;
-                                        } elseif ($rel_value == 2)
+                                        }
+                                        elseif ($rel_value == 2)
                                         {
                                             $release[$m->getEntityId()]['attributes'][$attr_name] = 1;
                                         }
                                     }
                                 }
-                            } else
+                            }
+                            else
                             {
                                 foreach ($attrs[$m->getEntityId()] as $attr_name => $attr_value)
                                 {
@@ -554,14 +567,23 @@ class Arp_generator {
 
     public function arpToArrayByInherit($provider)
     {
+        $lang = 'en';
+        /**
+         * disabled for the moment
+         *     $langMethodExist = method_exists('MY_Controller','getLang');
+         *     if($langMethodExist)
+         *     {
+         *         $lang = MY_Controller::getLang();
+         *     }
+         */
         $idp = null;
         $release = array();
-      
-        if($provider instanceOf models\Provider)
+
+        if ($provider instanceOf models\Provider)
         {
-           $idp = $provider;
+            $idp = $provider;
         }
-        elseif(is_numeric($provider) && !empty($this->idp))
+        elseif (is_numeric($provider) && !empty($this->idp))
         {
             $tmp_id = $this->idp->getId();
             if ($tmp_id == $provider)
@@ -572,28 +594,25 @@ class Arp_generator {
             {
                 log_message('debug', "IdP not found");
                 return null;
-
             }
         }
         else
         {
-            log_message('error','PE: arpToArrayByInherit couldnt');
+            log_message('error', 'PE: arpToArrayByInherit couldnt');
             return null;
         }
 
-        log_message('debug','PE: start arpToArrayByInherit for entityid: '.$idp); 
+        log_message('debug', 'PE: start arpToArrayByInherit for entityid: ' . $idp);
 
         $global_policy = array();
         $tmp_attrs = new models\Attributes();
         $tmp_providers = new models\Providers();
-        $attrDefinitions = $tmp_attrs->getAttributes();
-        $tmp_idp = new models\Providers;
+        $tmp_attrs->getAttributes();
         /**
          * get all defined policies for idp
          */
-        $policies = $idp->getAttributeReleasePolicies();
+        $idp->getAttributeReleasePolicies();
 
-        $tmp_myfeds = $tmp_providers->getTrustedActiveFeds($idp);
         $members = $tmp_providers->getSPsForArp($idp);
         $feds_collection = array();
         if ($members->count() == 0)
@@ -603,15 +622,14 @@ class Arp_generator {
         foreach ($members as $t)
         {
             $feds2 = $t->getMembership();
-            foreach($feds2 as $ff)
+            foreach ($feds2 as $ff)
             {
                 $fedid = $ff->getFederation()->getId();
-                if(!isset($feds_collection[''.$fedid.'']))
+                if (!isset($feds_collection['' . $fedid . '']))
                 {
-                    $feds_collection[''.$fedid.''] = new \Doctrine\Common\Collections\ArrayCollection();
-                     
+                    $feds_collection['' . $fedid . ''] = new \Doctrine\Common\Collections\ArrayCollection();
                 }
-                $feds_collection[''.$fedid.'']->add($t) ;
+                $feds_collection['' . $fedid . '']->add($t);
             }
         }
         $tmp_requirements = new models\AttributeRequirements;
@@ -629,14 +647,14 @@ class Arp_generator {
             $tmpexl = $this->em->getRepository("models\Provider")->findBy(array('entityid' => $excluded));
             foreach ($tmpexl as $tmpv)
             {
-                if($members->contains($tmpv))
+                if ($members->contains($tmpv))
                 {
-                   $members->removeElement($tmpv);
+                    $members->removeElement($tmpv);
                 }
                 $excludedById[] = $tmpv->getId();
             }
         }
-        
+
         log_message('debug', 'excluded SP from arp by id:' . serialize($excludedById));
 
         foreach ($members as $m_value)
@@ -680,32 +698,33 @@ class Arp_generator {
                 {
                     $sp_entityid = $sp_requester->getEntityId();
                     $custom_policies[$sp_entityid][$key->getAttribute()->getName()] = $key->getRawdata();
-                } else
+                }
+                else
                 {
                     log_message('warning', 'Found orphaned (or SP is disabled) custom policy with id:' . $key->getId());
                 }
             }
         }
         $specific_attributes = array();
-        $t_sp = new models\Providers;
-        $spec_attrs = $tmp_s_attrs->getSpecificPolicyAttributes($idp);
         if (!empty($spec_attrs))
         {
-            foreach ($spec_attrs as $skey => $svalue)
+            foreach ($spec_attrs as $svalue)
             {
                 if (isset($members_byid[$svalue->getRequester()]))
                 {
                     $ent = $members_byid[$svalue->getRequester()];
-                } elseif (!in_array($svalue->getRequester(), $excludedById))
+                    if (!empty($ent))
+                    {
+                        $specific_attributes[$ent->getEntityId()][$svalue->getAttribute()->getName()] = $svalue->getPolicy();
+                    }
+                }
+                elseif (!in_array($svalue->getRequester(), $excludedById))
                 {
                     log_message('warning', 'found orphaned arps in db : sprequest:' . $svalue->getRequester() . ' doesn exist in provider table or SP is disabled');
-                } else
+                }
+                else
                 {
                     log_message('debug', 'sprequest:' . $svalue->getRequester() . ' is excluded from arp not generating');
-                }
-                if (!empty($ent))
-                {
-                    $specific_attributes[$ent->getEntityId()][$svalue->getAttribute()->getName()] = $svalue->getPolicy();
                 }
             }
         }
@@ -717,13 +736,12 @@ class Arp_generator {
                 $federation_policy[$f->getRequester()][$f->getAttribute()->getName()] = $f->getPolicy();
             }
         }
-        log_message('debug','PE federation policy: '.serialize($federation_policy));
+        log_message('debug', 'PE federation policy: ' . serialize($federation_policy));
 
         foreach ($g_attrs as $g)
         {
             $global_policy[$g->getAttribute()->getName()] = $g->getPolicy();
         }
-      
 
         foreach ($s_attrs as $s)
         {
@@ -735,16 +753,17 @@ class Arp_generator {
             if (array_key_exists($k, $global_policy))
             {
                 $m_policy[$k] = $global_policy[$k];
-            } else
+            }
+            else
             {
                 $m_policy[$k] = 0;
             }
         }
 
-        log_message('debug','PE supported/default merge: '. serialize($m_policy));
-        
-        
-        
+        log_message('debug', 'PE supported/default merge: ' . serialize($m_policy));
+
+
+
         foreach ($members as $m)
         {
             /* set default policy */
@@ -753,43 +772,36 @@ class Arp_generator {
             /* overwite with fede */
             foreach ($feds_collection as $key => $value)
             {
-                if (array_key_exists($key, $federation_policy))
+                if (array_key_exists($key, $federation_policy) && $value->contains($m))
                 {
-                    
+
                     /* check if entityid is a members of specified federtion */
-                    if ($value->contains($m))
+
+                    log_message('debug', 'PE : collection ' . $key . ' :: ' . $m->getEntityId());
+                    /**
+                     * overwrite policy
+                     */
+                    foreach ($federation_policy[$key] as $k2 => $v2)
                     {
-                        log_message('debug','PE : collection '.$key.' :: '.$m->getEntityId());
-                        /**
-                         * overwrite policy
-                         */
-                        foreach($federation_policy[$key] as $k2=>$v2)
+
+                        if (isset($overwritePolicy[$k2]) && ($v2 > $overwritePolicy[$k2]))
                         {
-                            
-                            if(isset($overwritePolicy[$k2]))
-                            {
-                                if($v2 > $overwritePolicy[$k2])
-                                {
-                                    $overwritePolicy[$k2] = $v2;
-                                }
-                            }
-                            else
-                            {
-                                $overwritePolicy[$k2] = $v2;
-                            }
-                        }             
+                            $overwritePolicy[$k2] = $v2;
+                        }
+                        else
+                        {
+                            $overwritePolicy[$k2] = $v2;
+                        }
                     }
                 }
             }
-            $attrs[$m->getEntityId()] = array_replace($attrs[$m->getEntityId()], array_intersect_key($overwritePolicy,$attrs[$m->getEntityId()]));
+            $attrs[$m->getEntityId()] = array_replace($attrs[$m->getEntityId()], array_intersect_key($overwritePolicy, $attrs[$m->getEntityId()]));
         }
-        $i = 0;
 
         foreach ($specific_attributes as $pkey => $pvalue)
-        {          
-            if (array_key_exists($pkey, $attrs))
+        {
+            if (isset($attrs[''.$pkey.'']))
             {
-                //$attrs[$pkey] = array_replace($attrs[$pkey], $pvalue);             
                 $attrs[$pkey] = array_merge($attrs[$pkey], array_intersect_key($pvalue, $attrs[$pkey]));
             }
         }
@@ -800,7 +812,10 @@ class Arp_generator {
             $release[$m_entityid]['attributes'] = array();
             $release[$m_entityid]['custom'] = array();
             $release[$m_entityid]['entityid'] = $m_entityid;
-            $release[$m_entityid]['name'] = $m->getName();
+            $release[$m_entityid]['name'] = $m->getNameToWebInLang($lang, 'sp');
+
+
+
             $release[$m_entityid]['attributes'] = $supported_attrs;
             $release[$m_entityid]['spid'] = $m->getId();
             $release[$m_entityid]['req'] = array();
@@ -827,21 +842,23 @@ class Arp_generator {
                         if ($req_value == 'required' && ($rel_value > 0))
                         {
                             $release[$m_entityid]['attributes'][$attr_name] = 1;
-                        } elseif ($rel_value == 2)
+                        }
+                        elseif ($rel_value == 2)
                         {
                             $release[$m_entityid]['attributes'][$attr_name] = 1;
-                        } else
+                        }
+                        else
                         {
                             $release[$m_entityid]['attributes'][$attr_name] = 0;
                         }
                     }
                 }
-            } else
+            }
+            else
             {
                 $feds_1 = $m->getActiveFederations();
                 if (!empty($feds_1))
                 {
-                    $tmp_fed_req = array();
                     foreach ($feds_1->getValues() as $f_key => $f_value)
                     {
                         /* check if sp's federation matches idp federation */
@@ -866,13 +883,15 @@ class Arp_generator {
                                         if ($req_value == 'required' && ($rel_value > 0))
                                         {
                                             $release[$m->getEntityId()]['attributes'][$attr_name] = 1;
-                                        } elseif ($rel_value == 2)
+                                        }
+                                        elseif ($rel_value == 2)
                                         {
                                             $release[$m->getEntityId()]['attributes'][$attr_name] = 1;
                                         }
                                     }
                                 }
-                            } else
+                            }
+                            else
                             {
                                 foreach ($attrs[$m->getEntityId()] as $attr_name => $attr_value)
                                 {

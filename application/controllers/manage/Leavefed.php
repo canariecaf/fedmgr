@@ -47,7 +47,7 @@ class Leavefed extends MY_Controller {
    
     public function leavefederation($providerid=null)
     {
-        if(empty($providerid) or !is_numeric($providerid))
+        if(empty($providerid) || !is_numeric($providerid))
         {
              show_error('Incorrect provider id provided',404);
              return;
@@ -86,6 +86,13 @@ class Leavefed extends MY_Controller {
         {
            $feds_dropdown[$f->getId()] = $f->getName();
         }
+        $lang = MY_Controller::getLang();
+        $enttype = $provider->getType();
+        
+        $data['name'] = $provider->getNameToWebInLang($lang,$enttype);
+        $data['titlepage'] = anchor(base_url().'providers/detail/show/'.$provider->getId().'',$data['name']);
+        $data['subtitlepage']=lang('leavefederation');
+
         if($this->submit_validate() === TRUE)
         {
              $fedid = $this->input->post('fedid');
@@ -111,7 +118,7 @@ class Leavefed extends MY_Controller {
                    $rm_arp_msg .="It means when in the future you join this federation you will need to set attribute release policy for it again<br />";
                 }
                 $spec_arps_to_remove = $p_tmp->getSpecCustomArpsToRemove($provider);
-                if(!empty($spec_arps_to_remove) && is_array($spec_arps_to_remove) and count($spec_arps_to_remove) > 0)
+                if(!empty($spec_arps_to_remove) && is_array($spec_arps_to_remove) && count($spec_arps_to_remove) > 0)
                 {
                    foreach($spec_arps_to_remove as $rp)
                    {
@@ -165,19 +172,22 @@ class Leavefed extends MY_Controller {
                   $buttons = '<div class="buttons"><button type="submit" name="modify" value="submit" class="savebutton saveicon">'.lang('rr_save').'</button></div>';
                   $form = form_open(current_url(),array('id'=>'formver2','class'=>'span-15'));
                   $form .= form_fieldset('Leaving federation form');
-                  $form .= '<ol><li>';
-                  $form .= form_label(''.lang('rr_selectfedtoleave').'','fedid');
-                  $form .= form_dropdown('fedid', $feds_dropdown, set_value('fedid'));
+                  $form .= '<div class="small-12 columns">';
+                  $form .= '<div class="small-3 columns">';
+                  $form .= '<label for="fedid" class="right inline">'.lang('rr_selectfedtoleave').'</label>';
+                  $form .= '</div>';
+                  $form .= '<div class="small-9 medium-7 columns end">'.form_dropdown('fedid', $feds_dropdown, set_value('fedid')).'</div></div>';
+                  $form .= '<div class="small-12 center columns">';
                   $type = $provider->getType();
                   if(strcmp($type,'IDP')!=0)
                   {
-                      $form .='<div class="alert"><p>'.lang('rr_alertrmspecpoliciecsp').'</p></div>';
+                      $form .='<div data-alert class="alert-box warning"><p>'.lang('rr_alertrmspecpoliciecsp').'</p></div>';
                   }
                   else
                   {
-                      $form .='<div class="alert"><p>'.lang('rr_alertrmspecpoliciecidp').'</p></div>';
+                      $form .='<div data-alert class="alert-box warning"><p>'.lang('rr_alertrmspecpoliciecidp').'</p></div>';
                   }
-                  $form .= '</li></ol>';
+                  $form .= '</div></div>';
                   $form .= $buttons;
                   $form .= form_fieldset_close();
                   $form .= form_close();

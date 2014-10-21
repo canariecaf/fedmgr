@@ -61,7 +61,7 @@ class Custom_policies extends MY_Controller {
     {
         $idp = $this->tmp_providers->getOneIdPById($idp_id);
         $sp = $this->tmp_providers->getOneSpById($sp_id);
-        if (empty($idp) or empty($sp))
+        if (empty($idp) || empty($sp))
         {
             show_error(''.lang('rerror_providernotexist').'', 404);
         }
@@ -162,11 +162,6 @@ class Custom_policies extends MY_Controller {
 
 
             $supported_attrs = $this->tmp_arps->getSupportedAttributes($idp);
-            $attr_formdown = array();
-            foreach ($supported_attrs as $s)
-            {
-                $attr_formdown[$s->getAttribute()->getName()] = $s->getAttribute()->getFullname();
-            }
             $data['idp_id'] = $idp->getId();
             $data['idp_name'] = $idp->getName();
             $data['locked'] = $locked;

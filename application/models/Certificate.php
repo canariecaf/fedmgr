@@ -98,7 +98,6 @@ class Certificate
     public function setCertdata($certdata = null)
     {
         
-        //      $certdata = preg_replace(array('/\s{2,}/', '/[\t\n]/'), '', $certdata);
         $this->certdata = trim($certdata);
         return $this;
     }
@@ -126,7 +125,7 @@ class Certificate
      */
     public function setCertUse($use = NULL)
     {
-        if (!empty($use) && ($use == 'signing' OR $use == 'encryption'))
+        if (!empty($use) && ($use === 'signing' || $use === 'encryption'))
         {
             $this->certusage = $use;
         } else
@@ -173,7 +172,7 @@ class Certificate
 */
     public function setCertType($type=null)
     {
-        if (empty($type) or $type === 'x509')
+        if (empty($type) || $type === 'x509')
         {
             $type = 'X509Certificate';
         }
@@ -311,7 +310,6 @@ class Certificate
         if ($this->getCertType() == 'X509Certificate')
         {
             $parsed = openssl_x509_parse($cert);
-            //$validFrom = date('Y-m-d H:i:s', $parsed['validFrom_time_t']);
             $validTo = date('Y-m-d H:i:s', $parsed['validTo_time_t']);
             return $validTo;
         } else
@@ -333,9 +331,6 @@ class Certificate
         if ($this->getCertType() == 'X509Certificate')
         {
             $parsed = openssl_x509_parse($cert);
-            $validFrom = date('Y-m-d H:i:s', $parsed['validFrom_time_t']);
-            $validTo = date('Y-m-d H:i:s', $parsed['validTo_time_t']);
-            $now = date('Y-m-d H:i:s', time());
             $period = $parsed['validTo_time_t'] - time();
             $days = (int) $period / 60 / 60 / 24;
 
@@ -420,10 +415,6 @@ class Certificate
     public function getCertificateToXML(\DOMElement $parent)
     {
         $e = $parent->ownerDocument->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:KeyDescriptor');
-        /**
-         * usage null/singing/encrypting
-         */
-        //$use = $this->getCertUse();
 
         $certbody = $this->getCertDataNoHeaders();
          

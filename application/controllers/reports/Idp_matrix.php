@@ -48,7 +48,7 @@ class Idp_matrix extends MY_Controller {
 
     public function show($idpid)
     {
-        if (empty($idpid) OR !is_numeric($idpid))
+        if (empty($idpid) || !is_numeric($idpid))
         {
             show_error('Wrong or empty id', 404);
         }
@@ -107,11 +107,15 @@ class Idp_matrix extends MY_Controller {
                 $el = $ex->getElement();
                 if ($el === 'Logo')
                 {
-                    $data['provider_logo_url'] = $ex->getLogoValue();
+                    $data['providerlogourl'] = $ex->getLogoValue();
                     break;
                 }
             }
         }
+        
+        $data['titlepage'] = lang('identityprovider').': '.anchor(''.base_url().'providers/detail/show/'.$data['idpid'],$data['idpname']).'<br />';
+        $data['titlepage'] .= $data['entityid'];
+        $data['subtitlepage']= lang('rr_arpoverview');
         if (empty($arparray))
         {
             $data['content_view'] = 'reports/idp_matrix_show_view';
@@ -219,10 +223,8 @@ class Idp_matrix extends MY_Controller {
             }
             array_unshift($mrows[$key], $t);
         }
-        //$thead = array_keys($attrmatrix_template);
         foreach ($attrmatrix_template as $k => $v)
         {
-            //  $thead[] = '<span style="-moz-transform: rotate(-90deg)">'.$k.'</span>';
             $thead[] = '
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="190">
                   <text id="thetext" transform="rotate(270, 9, 0) translate(-180,3)">' . htmlentities($k) . '</text>

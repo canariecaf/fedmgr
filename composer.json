@@ -1,0 +1,9 @@
+{
+    "name": "edugate/resourceregistry",
+    "description": "Federation(s) (SAML)  management",
+    "license": "MIT",
+    "require": {
+        "doctrine/orm": "*",
+        "zendframework/zend-permissions-acl": "2.0.*"
+    }
+}

@@ -1,9 +1,8 @@
 <?php
-
 if (!defined('BASEPATH'))
+{
     exit('No direct script access allowed');
-
-use \Doctrine\ORM\Query\ResultSetMapping;
+}
 
 /**
  * ResourceRegistry3
@@ -37,15 +36,11 @@ class Zacl {
         // Set the include path and require the needed files
         set_include_path(get_include_path() . PATH_SEPARATOR . FCPATH . "application/libraries");
         require_once(APPPATH . '/libraries/Zend/Acl.php');
-        require_once(APPPATH . '/libraries/Zend/Acl/Role.php');
-        require_once(APPPATH . '/libraries/Zend/Acl/Resource.php');
+     
         $this->acl = new Zend_Acl();
         $this->acl->addRole(new Zend_Acl_Role('default_role'));
 
-        /**
-         * get  roles
-         */
-        //$defined_roles = $this->em->getRepository("models\AclRole")->findAll();
+       
 
 
         $defined_roles = $this->em->getRepository("models\AclRole")->findAll();
@@ -112,8 +107,7 @@ class Zacl {
             $this->acl->addRole('current_user', 'default_role');
         }
         $this->acl->addResource(new Zend_Acl_Resource('root_resource'));
-        //$this->acl->allow('Member', null, 'view');
-
+       
         $defined_resources = $this->em->getRepository("models\AclResource")->findAll();
         foreach ($defined_resources as $res)
         {
@@ -128,14 +122,7 @@ class Zacl {
                 $this->acl->addResource($resource, 'root_resource');
             }
             $default_access = $res->getDefaultValue();
-            if ($default_access == "none" or $default_access == "0")
-            {
-                //$this->acl->deny(null,$resource,null);
-            }
-            else
-            {
-                //$this->acl->allow(null,$resource,$res->getDefaultValue());
-            }
+ 
         }
         $defined_acls = $this->em->getRepository("models\Acl")->findAll();
         if (!empty($defined_acls))
@@ -307,7 +294,7 @@ class Zacl {
 
             log_message('debug', 'user can manage permissions');
         }
-        // log_message('debug', 'GKS1: resource:' . $resource . ', action:' . $action . ', user:' . $s_user->getUsername() . ', group:' . $group);
+        
         $already_has_access = $this->check_user_acl($resource, $action, $s_user, $group);
         $resourceExist = FALSE;
         $aclRoleExist = FALSE;
@@ -344,16 +331,9 @@ class Zacl {
             {
                 log_message('debug', 'found acl_group called: ' . $group);
             }
-            $acl_children = $acl_group->getChildren();
-            foreach ($acl_children as $c)
-            {
-                $r = $c->getResource();
-                if ($r == $resource)
-                {
-                    $acl_resource = $c;
-                    break;
-                }
-            }
+            
+            $acl_resource = $this->em->getRepository("models\AclResource")->findOneBy(array('resource'=>$resource));
+      
             if (empty($acl_resource))
             {
                 log_message('debug', 'not found acl_resource (' . $resource . ')in group');
@@ -382,9 +362,7 @@ class Zacl {
             else
             {
                 $acls = $this->em->getRepository("models\Acl")->findBy(array('resource' => '' . $acl_resource->getId() . '', 'role' => '' . $acl_role->getId() . '', 'action' => '' . $action . ''));
-                // log_message('debug', 'GKS2: ' . count($acls));
-                // log_message('debug','GKS2: '.serialize(array_keys($acls)));
-
+     
                 $noAcls = count($acls);
                 if ($noAcls === 0)
                 {

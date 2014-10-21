@@ -39,7 +39,7 @@ class Sp_matrix extends MY_Controller
     }
     public function members_urls($spid)
     {
-	if(empty($spid) OR !is_numeric($spid))
+	if(empty($spid) || !is_numeric($spid))
         {
             show_error('Wrong or empty id', 404);
         }
@@ -127,7 +127,7 @@ class Sp_matrix extends MY_Controller
             $this->session->set_flashdata('target', $this->current_site);
             redirect('auth/login', 'location');
         }
-	if(empty($spid) OR !is_numeric($spid))
+	if(empty($spid) || !is_numeric($spid))
         {
             show_error('Wrong or empty id', 404);
         }
@@ -137,13 +137,19 @@ class Sp_matrix extends MY_Controller
             show_error('Service Provider not found',404);
         }
         $members = $this->_get_members($sp);
+        $lang = MY_Controller::getLang();
+        $titlename = $sp->getNameToWebInLang($lang, $sp->getType());
+        $data['titlepage'] = '<a href="' . base_url() . 'providers/detail/show/' . $sp->getId() . '">' .$titlename . '</a>';
+        $data['subtitlepage'] = lang('rr_provideingattrsoverview');
 
+        $this->title = $titlename;
         $cache_time = $this->config->item('arp_cache_time');
         $data['arpcachetimeicon'] = showBubbleHelp('ARPs are cached for '.$cache_time.' seconds');
         $data['load_matrix_js'] = TRUE; 
         $data['sites_url'] = base_url().'reports/sp_matrix/members_urls/'.$spid;
         $data['entityid'] = $sp->getEntityId();
         $data['entityname'] = $sp->getName();
+        
         $data['spid'] = $sp->getId();
         $data['content_view'] = 'reports/sp_matrix_show_view';
         $this->load->view('page',$data);
