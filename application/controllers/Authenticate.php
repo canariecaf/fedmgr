@@ -61,23 +61,24 @@ class Authenticate extends MY_Controller {
            }
            else
            {
-               $this->form_validation->set_rules('username', lang('rr_username'), 'required|xss_clean');
-               $this->form_validation->set_rules('password', lang('rr_password'), 'required');
+               $this->form_validation->set_rules('username', lang('rr_username'), 'trim|required');
+               $this->form_validation->set_rules('password', lang('rr_password'), 'trim|required');
                $validated = $this->form_validation->run();
                if ($validated === TRUE)
                {
                    if ($this->j_auth->login($this->input->post('username'), $this->input->post('password')))
                    {
                        echo 'OK';
+                       return;
                    }
                    else
                    {
-                         $auth_error = '<div id="notification_error">'.lang('error_authn').'</div>';
+                         $auth_error = ''.lang('error_authn').'';
                    }
                }
                else
                {
-                    $auth_error = '<div id="notification_error">'.lang('error_incorrectinput').'</div>';
+                    $auth_error = ''.lang('error_incorrectinput').'';
                }
 
            }
@@ -87,9 +88,11 @@ class Authenticate extends MY_Controller {
         else
         {
              set_status_header(401);
-             $auth_error = '<div id="notification_error">not ajax</div>';
+             $auth_error = 'not ajax';
         }
+        set_status_header(401);
         echo $auth_error;
+        return;
        
     }
     

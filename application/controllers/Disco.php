@@ -35,13 +35,19 @@ class Disco extends MY_Controller {
         }
         $this->logo_url = $this->logo_baseurl . $this->logo_basepath;
         $this->wayflist = array();
+        $this->output->set_header("X-Frame-Options: SAMEORIGIN");
+        $this->output->set_header("Access-Control-Allow-Origin: *");
     }
 
-    private function providerToDisco(models\Provider $ent)
+    private function providerToDisco(models\Provider $ent, $type = null)
     {
+        if($type == null)
+        {
+            $type = 'idp';
+        }
         $r['entityID'] = $ent->getEntityId();
         $r['title'] = $ent->getNameToWebInLang('en');
-        $doFilter = array('t' => array('idp'), 'n' => array('mdui'), 'e' => array('GeolocationHint', 'Logo'));
+        $doFilter = array('t' => array(''.$type.''), 'n' => array('mdui'), 'e' => array('GeolocationHint', 'Logo'));
         $extend = $ent->getExtendMetadata()->filter(
                 function(models\ExtendMetadata $entry) use ($doFilter)
         {
@@ -97,7 +103,9 @@ class Disco extends MY_Controller {
         }
         if (!empty($m) && $m != 'metadata.json')
         {
-            show_error('Request not allowed', 403);
+            set_status_header(403);
+            echo 'Request not allowed';
+            return;
         }
         if (!empty($_GET['callback']))
         {
@@ -113,9 +121,11 @@ class Disco extends MY_Controller {
         $me = $tmp->getOneSpByEntityId($name);
         if (empty($me))
         {
-            log_message('error', 'Failed generating json  for provided entity:' . $name);
-            show_error('unknown provider', 404);
+              log_message('error', 'Failed generating json  for provided entity:' . $name);
+            set_status_header(404);
+            echo 'Unknown serivce provider';
             return;
+          
         }
         $keyprefix = getCachePrefix();
         $this->load->driver('cache', array('adapter' => 'memcached', 'key_prefix' => $keyprefix));
@@ -147,40 +157,70 @@ class Disco extends MY_Controller {
             foreach ($p1 as $ents)
             {
                 $allowed = true;
-                if ($ents->getAvailable())
+                if ($white)
                 {
-                    if ($white)
+                    if (!in_array($ents->getEntityId(), $this->wayflist))
                     {
-                        if (!in_array($ents->getEntityId(), $this->wayflist))
-                        {
-                            $allowed = false;
-                        }
-                    }
-                    if ($allowed)
-                    {
-
-                        $output[$oi] = $this->providerToDisco($ents);
-                        $oi++;
+                        $allowed = false;
                     }
                 }
+                if ($allowed)
+                {
+
+                   $output[$oi] = $this->providerToDisco($ents);
+                   $oi++;
+                 }
             }
+            $jsonoutput = json_encode($output);
+            $this->cache->save($cacheid, $jsonoutput, 600);
+            
             if (!empty($call_array) && is_array($call_array) && count($call_array) == 3 && $call_array['0'] == 'dj' && $call_array['1'] == 'md' && is_numeric($call_array['2']))
             {
-                $jsonoutput = $call . '(' . json_encode($output) . ')';
+               $data['result'] = $call . '(' .  $jsonoutput . ')';
             }
             else
             {
-                $jsonoutput = json_encode($output);
+                $data['result'] = $jsonoutput;
             }
-            $data['result'] = $jsonoutput;
 
-            $this->cache->save($cacheid, $jsonoutput, 600);
         }
         else
         {
             log_message('debug', 'Cache: Discojoice for entity ' . $me->getId() . ' found in cache id:' . $cacheid . ', retrieving...');
-            $data['result'] = $cachedDisco;
+            
+            if (!empty($call_array) && is_array($call_array) && count($call_array) == 3 && $call_array['0'] == 'dj' && $call_array['1'] == 'md' && is_numeric($call_array['2']))
+            {
+               $data['result'] = $call . '(' .  $cachedDisco . ')';
+            }
+            else
+            {
+                $data['result'] = $cachedDisco;
+            }
         }
+        $this->load->view('disco_view', $data);
+    }
+    
+    
+    public function requester($encodedEntity = null)
+    {
+        if(empty($encodedEntity))
+        {
+            set_status_header(404);
+            echo 'entityID not provided';
+            return;
+        }
+        $entityid = base64url_decode($encodedEntity);
+        $tmp = new models\Providers;
+        $me = $tmp->getOneSpByEntityId($entityid);
+        if (empty($me))
+        {
+            set_status_header(404);
+            echo 'Unknown serivce provider';
+            return;
+        }
+        $result = $this->providerToDisco($me,'sp');
+        $jsonoutput = json_encode($result);
+        $data['result'] = $jsonoutput;
         $this->load->view('disco_view', $data);
     }
 

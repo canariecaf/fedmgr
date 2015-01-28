@@ -23,6 +23,7 @@ class Providerupdater
 
     protected $ci;
     protected $em;
+    protected $logtracks;
 
     function __construct()
     {
@@ -30,6 +31,7 @@ class Providerupdater
         $this->em = $this->ci->doctrine->em;
 
         $this->ci->load->library('tracker');
+        $this->logtracks = array();
     }
 
     public function getChangeProposal(models\Provider $ent, $chg)
@@ -42,7 +44,6 @@ class Providerupdater
         $currentCocs = $ent->getCoc();
         if (array_key_exists('regpol', $ch))
         {
-            log_message('debug', 'GKS ' . __METHOD__ . ' ' . serialize($ch['regpol']) . '');
             $currentRegPol = &$currentCocs;
             $regPolToAssign = array();
             foreach ($currentRegPol as $k => $v)
@@ -54,7 +55,6 @@ class Providerupdater
                     $foundkey = array_search($cid, $ch['regpol']);
                     if ($foundkey === null || $foundkey === false)
                     {
-                        log_message('debug', 'GKS not found ' . $cid);
                         $ent->removeCoc($v);
                     }
                 }
@@ -62,7 +62,6 @@ class Providerupdater
             $requestNew = false;
             foreach ($ch['regpol'] as $k => $v)
             {
-                log_message('debug', 'GKS assignign regpolicy id:' . $v);
                 if (!empty($v) && is_numeric($v))
                 {
                     $c = $this->em->getRepository("models\Coc")->findOneBy(array('id' => $v, 'type' => 'regpol'));
@@ -97,17 +96,484 @@ class Providerupdater
         }
     }
 
+    private function updateProviderExtend(models\Provider $ent, array $ch)
+    {
+        $m = array();
+        $type = $ent->getType();
+        if (strcasecmp($type, 'BOTH') == 0)
+        {
+            $extypes = array('idp', 'sp');
+        }
+        else
+        {
+            $extypes = array('' . strtolower($type) . '');
+        }
+        $langCodes = languagesCodes();
+        $extendsCollection = $ent->getExtendMetadata();
+        $uiinfoParent = array('idp' => null, 'sp' => null);
+        $discohintsParent = null;
+        $extendsInArray = array();
+        foreach ($extendsCollection as $e)
+        {
+            $extendsInArray['' . $e->getType() . '']['' . $e->getNamespace() . '']['' . $e->getElement() . ''][] = $e;
+            if ($e->getElement() == 'UIInfo' && $e->getNamespace() == 'mdui')
+            {
+                $uiinfoParent['' . $e->getType() . ''] = $e;
+            }
+            elseif ($e->getElement() == 'DiscoHints' && $e->getNamespace() == 'mdui' && $e->getType() == 'idp')
+            {
+                $discohintsParent = $e;
+            }
+        }
+        if (in_array('idp', $extypes))
+        {
+            if (empty($discohintsParent))
+            {
+                $discohintsParent = new models\ExtendMetadata;
+                $discohintsParent->setType('idp');
+                $discohintsParent->setNamespace('mdui');
+                $discohintsParent->setElement('DiscoHints');
+                $ent->setExtendMetadata($discohintsParent);
+            }
+            if (isset($ch['uii']['idpsso']['domainhint']) && is_array($ch['uii']['idpsso']['domainhint']))
+            {
+                $ch['uii']['idpsso']['domainhint'] = array_unique($ch['uii']['idpsso']['domainhint']);
+                if (isset($extendsInArray['idp']['mdui']['DomainHint']))
+                {
+                    foreach ($extendsInArray['idp']['mdui']['DomainHint'] as $k => $v)
+                    {
+                        $vId = $v->getId();
+                        if (array_key_exists($vId, $ch['uii']['idpsso']['domainhint']) && !empty($ch['uii']['idpsso']['domainhint']['' . $vId . '']))
+                        {
+                            $v->setValue($ch['uii']['idpsso']['domainhint']['' . $vId . '']);
+                            $this->em->persist($v);
+                        }
+                        else
+                        {
+                            $ent->getExtendMetadata()->removeElement($v);
+                            $this->em->remove($v);
+                        }
+                        unset($ch['uii']['idpsso']['domainhint']['' . $vId . '']);
+                    }
+                }
+                foreach ($ch['uii']['idpsso']['domainhint'] as $v)
+                {
+                    if (!empty($v))
+                    {
+                        $n = new models\ExtendMetadata;
+                        $n->setParent($discohintsParent);
+                        $n->setType('idp');
+                        $n->setNamespace('mdui');
+                        $n->setElement('DomainHint');
+                        $n->setValue($v);
+                        $n->setAttributes(array());
+                        $ent->setExtendMetadata($n);
+                        $this->em->persist($n);
+                    }
+                }
+            }
+            if (isset($ch['uii']['idpsso']['iphint']) && is_array($ch['uii']['idpsso']['iphint']))
+            {
+                $ch['uii']['idpsso']['iphint'] = array_unique($ch['uii']['idpsso']['iphint']);
+                if (isset($extendsInArray['idp']['mdui']['IPHint']))
+                {
+                    foreach ($extendsInArray['idp']['mdui']['IPHint'] as $k => $v)
+                    {
+                        $vId = $v->getId();
+                        if (array_key_exists($vId, $ch['uii']['idpsso']['iphint']) && !empty($ch['uii']['idpsso']['iphint']['' . $vId . '']))
+                        {
+                            $v->setValue($ch['uii']['idpsso']['iphint']['' . $vId . '']);
+                            $this->em->persist($v);
+                        }
+                        else
+                        {
+                            $ent->getExtendMetadata()->removeElement($v);
+                            $this->em->remove($v);
+                        }
+                        unset($ch['uii']['idpsso']['iphint']['' . $vId . '']);
+                    }
+                }
+                foreach ($ch['uii']['idpsso']['iphint'] as $v)
+                {
+                    if (!empty($v))
+                    {
+                        $n = new models\ExtendMetadata;
+                        $n->setParent($discohintsParent);
+                        $n->setType('idp');
+                        $n->setNamespace('mdui');
+                        $n->setElement('IPHint');
+                        $n->setValue($v);
+                        $n->setAttributes(array());
+                        $ent->setExtendMetadata($n);
+                        $this->em->persist($n);
+                    }
+                }
+            }
+        }
+        foreach ($extypes as $v)
+        {
+            if (empty($uiinfoParent['' . $v . '']))
+            {
+                $vparent = new models\ExtendMetadata;
+                $vparent->setType('' . $v . '');
+                $vparent->setNamespace('mdui');
+                $vparent->setElement('UIInfo');
+                $ent->setExtendMetadata($vparent);
+                $uiinfoParent['' . $v . ''] = $vparent;
+            }
+
+            if (isset($ch['prvurl']) && is_array($ch['prvurl']))
+            {
+                $origex = array();
+                $origs = array();
+                if (isset($extendsInArray['' . $v . '']['mdui']['PrivacyStatementURL']))
+                {
+                    foreach ($extendsInArray['' . $v . '']['mdui']['PrivacyStatementURL'] as $value)
+                    {
+                        $l = $value->getAttributes();
+                        $origex['' . $l['xml:lang'] . ''] = $value;
+                        $origs['' . $l['xml:lang'] . ''] = $value->getElementValue();
+                    }
+                }
+                $newex = array();
+                if (isset($ch['prvurl']['' . $v . 'sso']))
+                {
+                    $newex = $ch['prvurl']['' . $v . 'sso'];
+                    foreach ($origex as $key => $value)
+                    {
+                        if (array_key_exists($key, $ch['prvurl']['' . $v . 'sso']))
+                        {
+                            if (empty($ch['prvurl']['' . $v . 'sso']['' . $key . '']))
+                            {
+                                $value->setProvider(NULL);
+                                $extendsCollection->removeElement($value);
+                                $this->em->remove($value);
+                                unset($newex['' . $key . '']);
+                            }
+                            else
+                            {
+                                $value->setValue($ch['prvurl']['' . $v . 'sso']['' . $key . '']);
+                                $this->em->persist($value);
+                            }
+                            unset($ch['prvurl']['' . $v . 'sso']['' . $key . '']);
+                        }
+                        else
+                        {
+                            $value->setProvider(NULL);
+                            $extendsCollection->removeElement($value);
+                            $this->em->remove($value);
+                            unset($newex['' . $key . '']);
+                            unset($ch['prvurl']['' . $v . 'sso']['' . $key . '']);
+                        }
+                    }
+
+                    foreach ($ch['prvurl']['' . $v . 'sso'] as $key2 => $value2)
+                    {
+                        if (!empty($value2))
+                        {
+                            $nprvurl = new models\ExtendMetadata();
+                            $nprvurl->setType('' . $v . '');
+                            $nprvurl->setNamespace('mdui');
+                            $nprvurl->setElement('PrivacyStatementURL');
+                            $nprvurl->setAttributes(array('xml:lang' => $key2));
+                            $nprvurl->setValue($value2);
+                            $ent->setExtendMetadata($nprvurl);
+                            $nprvurl->setParent($uiinfoParent['' . $v . '']);
+                            $this->em->persist($nprvurl);
+                        }
+                    }
+                    $prvurldiffs = FALSE;
+                    $diff1 = array_diff_assoc($origs, $newex);
+                    if (count($diff1) > 0)
+                    {
+                        $prvurldiffs = TRUE;
+                    }
+                    else
+                    {
+                        $diff1 = array_diff_assoc($newex, $origs);
+                        if (count($diff1) > 0)
+                        {
+                            $prvurldiffs = TRUE;
+                        }
+                    }
+                    if ($prvurldiffs === TRUE)
+                    {
+                        $mk = 'PrivacyStatementURLs' . strtoupper($v);
+                        $m['' . $mk . ''] = array('before' => arrayWithKeysToHtml($origs), 'after' => arrayWithKeysToHtml($newex));
+                    }
+                }
+            }
+
+            // logos not updatting value - just remove entry or add new one
+            if (isset($ch['uii']['' . $v . 'sso']['logo']) && is_array($ch['uii']['' . $v . 'sso']['logo']))
+            {
+
+                $collection = array();
+                if (isset($extendsInArray['' . $v . '']['mdui']['Logo']))
+                {
+                    $collection = &$extendsInArray['' . $v . '']['mdui']['Logo'];
+                }
+
+
+                foreach ($collection as $c)
+                {
+                    $attrs = $c->getAttributes();
+                    $lang = @$attrs['xml:lang'];
+                    $url = $c->getEvalue();
+
+                    $width = $attrs['width'];
+                    $height = $attrs['height'];
+                    $size = $width . 'x' . $height;
+                    $logoid = $c->getId();
+                    if (empty($lang))
+                    {
+                        $lang = 0;
+                    }
+
+                    if (!isset($ch['uii']['' . $v . 'sso']['logo']['' . $logoid . '']))
+                    {
+                        log_message('debug', __METHOD__ . 'logo with id:' . $logoid . ' is removed');
+                        $ent->getExtendMetadata()->removeElement($c);
+                        $this->em->remove($c);
+                    }
+                    else
+                    {
+                        unset($ch['uii']['' . $v . 'sso']['logo']['' . $logoid . '']);
+                    }
+                }
+                foreach ($ch['uii']['' . $v . 'sso']['logo'] as $ke => $ve)
+                {
+                    if (isset($ve['url']) && isset($ve['lang']) && isset($ve['size']))
+                    {
+                        $canAdd = true;
+                        $nlogo = new models\ExtendMetadata;
+                        $nlogo->setParent($uiinfoParent['' . $v . '']);
+                        $nlogo->setType('' . $v . '');
+                        $nlogo->setNamespace('mdui');
+                        $nlogo->setValue($ve['url']);
+                        $nlogo->setElement('Logo');
+                        $attrs = array();
+                        if (strcasecmp($ve['lang'], '0') != 0)
+                        {
+                            $attrs['xml:lang'] = $ve['lang'];
+                        }
+                        $size = explode('x', $ve['size']);
+                        if (count($size) == 2)
+                        {
+                            foreach ($size as $sv)
+                            {
+                                if (!is_numeric($sv))
+                                {
+                                    $canAdd = false;
+                                    break;
+                                }
+                            }
+                            $attrs['width'] = $size[0];
+                            $attrs['height'] = $size[1];
+                        }
+                        else
+                        {
+                            $canAdd = false;
+                        }
+                        $nlogo->setAttributes($attrs);
+                        if ($canAdd)
+                        {
+                            $ent->setExtendMetadata($nlogo);
+                            $this->em->persist($nlogo);
+                        }
+                    }
+                    else
+                    {
+                        log_message('warning', __METHOD__ . ' missing url/lang/size of new logo in form - not adding into db');
+                    }
+                }
+            } // end logos update
+        }
+
+
+        /**
+         * start update UII
+         */
+        if ($type !== 'SP')
+        {
+            $typeFilter = array('idp');
+            $idpextend = $ent->getExtendMetadata()->filter(
+                    function(models\ExtendMetadata $entry) use ($typeFilter) {
+                return in_array($entry->getType(), $typeFilter);
+            });
+
+
+
+
+            $doFilter = array('t' => array('idp'), 'n' => array('mdui'), 'e' => array('DisplayName', 'Description', 'InformationURL'));
+            $e = $ent->getExtendMetadata()->filter(
+                    function(models\ExtendMetadata $entry) use ($doFilter) {
+                return in_array($entry->getType(), $doFilter['t']) && in_array($entry->getNamespace(), $doFilter['n']) && in_array($entry->getElement(), $doFilter['e']);
+            });
+            $exarray = array();
+            foreach ($e as $v)
+            {
+                $l = $v->getAttributes();
+                if (isset($l['xml:lang']))
+                {
+                    $exarray['' . $v->getElement() . '']['' . $l['xml:lang'] . ''] = $v;
+                }
+                else
+                {
+                    log_message('error', 'ExentedMetadata element with id:' . $v->getId() . ' doesnt contains xml:lang attr');
+                }
+            }
+            $mduiel = array('displayname' => 'DisplayName', 'desc' => 'Description', 'helpdesk' => 'InformationURL');
+            foreach ($mduiel as $elkey => $elvalue)
+            {
+                if (isset($ch['uii']['idpsso']['' . $elkey . '']) && is_array($ch['uii']['idpsso']['' . $elkey . '']))
+                {
+                    $doFilter = array('' . $elvalue . '');
+                    $collection = $ent->getExtendMetadata()->filter(
+                            function(models\ExtendMetadata $entry) use ($doFilter) {
+                        return ($entry->getType() === 'idp') && ($entry->getNamespace() === 'mdui') && in_array($entry->getElement(), $doFilter);
+                    });
+                    foreach ($collection as $c)
+                    {
+                        $attrs = $c->getAttributes();
+                        $lang = $attrs['xml:lang'];
+                        if (!isset($ch['uii']['idpsso']['' . $elkey . '']['' . $lang . '']))
+                        {
+                            $ent->getExtendMetadata()->removeElement($c);
+                            $this->em->remove($c);
+                        }
+                    }
+                    foreach ($ch['uii']['idpsso']['' . $elkey . ''] as $key3 => $value3)
+                    {
+
+                        if (!isset($exarray['' . $elvalue . '']['' . $key3 . '']) && !empty($value3) && array_key_exists($key3, $langCodes))
+                        {
+                            $newelement = new models\ExtendMetadata;
+                            $newelement->setParent($uiinfoParent['idp']);
+                            $newelement->setType('idp');
+                            $newelement->setNamespace('mdui');
+                            $newelement->setValue($value3);
+                            $newelement->setElement($elvalue);
+                            $newelement->setAttributes(array('xml:lang' => $key3));
+                            $ent->setExtendMetadata($newelement);
+                            $this->em->persist($newelement);
+                        }
+                        elseif (isset($exarray['' . $elvalue . '']['' . $key3 . '']))
+                        {
+                            if (empty($value3))
+                            {
+                                $exarray['' . $elvalue . '']['' . $key3 . '']->setProvider(NULL);
+                                $ent->getExtendMetadata()->removeElement($exarray['' . $elvalue . '']['' . $key3 . '']);
+                                $this->em->remove($exarray['' . $elvalue . '']['' . $key3 . '']);
+                            }
+                            else
+                            {
+                                $exarray['' . $elvalue . '']['' . $key3 . '']->setValue($value3);
+                                $this->em->persist($exarray['' . $elvalue . '']['' . $key3 . '']);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if ($type !== 'IDP')
+        {
+            $typeFilter = array('sp');
+            $spextend = $ent->getExtendMetadata()->filter(
+                    function(models\ExtendMetadata $entry) use ($typeFilter) {
+                return in_array($entry->getType(), $typeFilter);
+            });
+            $doFilter = array('t' => array('sp'), 'n' => array('mdui'), 'e' => array('DisplayName', 'Description', 'InformationURL'));
+            $e = $ent->getExtendMetadata()->filter(
+                    function(models\ExtendMetadata $entry) use ($doFilter) {
+                return in_array($entry->getType(), $doFilter['t']) && in_array($entry->getNamespace(), $doFilter['n']) && in_array($entry->getElement(), $doFilter['e']);
+            });
+            $exarray = array();
+            foreach ($e as $v)
+            {
+                $l = $v->getAttributes();
+                if (isset($l['xml:lang']))
+                {
+                    $exarray['' . $v->getElement() . '']['' . $l['xml:lang'] . ''] = $v;
+                }
+                else
+                {
+                    log_message('error', 'ExentedMetadata element with id:' . $v->getId() . ' doesnt contains xml:lang attr');
+                }
+            }
+            $mduiel = array('displayname' => 'DisplayName', 'desc' => 'Description', 'helpdesk' => 'InformationURL');
+            foreach ($mduiel as $elkey => $elvalue)
+            {
+                if (isset($ch['uii']['spsso']['' . $elkey . '']) && is_array($ch['uii']['spsso']['' . $elkey . '']))
+                {
+                    $doFilter = array('' . $elvalue . '');
+                    $collection = $ent->getExtendMetadata()->filter(
+                            function(models\ExtendMetadata $entry) use ($doFilter) {
+                        return ($entry->getType() === 'sp') && ($entry->getNamespace() === 'mdui') && in_array($entry->getElement(), $doFilter);
+                    });
+                    foreach ($collection as $c)
+                    {
+                        $attrs = $c->getAttributes();
+                        $lang = $attrs['xml:lang'];
+                        if (!isset($ch['uii']['spsso']['' . $elkey . '']['' . $lang . '']))
+                        {
+                            $ent->getExtendMetadata()->removeElement($c);
+                            $this->em->remove($c);
+                        }
+                    }
+                    foreach ($ch['uii']['spsso']['' . $elkey . ''] as $key3 => $value3)
+                    {
+
+                        if (!isset($exarray['' . $elvalue . '']['' . $key3 . '']) && !empty($value3) && array_key_exists($key3, $langCodes))
+                        {
+                            $newelement = new models\ExtendMetadata;
+                            $newelement->setParent($uiinfoParent['sp']);
+                            $newelement->setType('sp');
+                            $newelement->setNamespace('mdui');
+                            $newelement->setValue($value3);
+                            $newelement->setElement($elvalue);
+                            $newelement->setAttributes(array('xml:lang' => $key3));
+                            $ent->setExtendMetadata($newelement);
+                            $this->em->persist($newelement);
+                        }
+                        elseif (isset($exarray['' . $elvalue . '']['' . $key3 . '']))
+                        {
+                            if (empty($value3))
+                            {
+                                $exarray['' . $elvalue . '']['' . $key3 . '']->setProvider(NULL);
+                                $ent->getExtendMetadata()->removeElement($exarray['' . $elvalue . '']['' . $key3 . '']);
+                                $this->em->remove($exarray['' . $elvalue . '']['' . $key3 . '']);
+                            }
+                            else
+                            {
+                                $exarray['' . $elvalue . '']['' . $key3 . '']->setValue($value3);
+                                $this->em->persist($exarray['' . $elvalue . '']['' . $key3 . '']);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        /**
+         * end update UII
+         */
+        foreach ($uiinfoParent as $v)
+        {
+            if (!empty($v))
+            {
+                $this->em->persist($v);
+            }
+        }
+        $this->logtracks = array_merge($this->logtracks, $m);
+        return $ent;
+    }
+
     public function updateProvider(models\Provider $ent, array $ch)
     {
         // $m - array for modifications
         $entid = $ent->getId();
         $m = array();
         $type = $ent->getType();
-        $langCodes = languagesCodes();
-        $ex = $ent->getExtendMetadata();
-        $idpMDUIparent = null;
-        $spMDUIparent = null;
-        $extend = array();
         $allowedAABind = getAllowedSOAPBindings();
         $spartidx = array();
         $idpartidx = array('-1');
@@ -126,21 +592,8 @@ class Providerupdater
             }
         }
         log_message('debug', 'disallowedpart: ' . serialize($dissalowedparts));
-        foreach ($ex as $e)
-        {
-            $extend['' . $e->getType() . '']['' . $e->getNamespace() . '']['' . $e->getElement() . ''][] = $e;
-            if ($e->getElement() == 'UIInfo' && $e->getNamespace() == 'mdui')
-            {
-                if ($e->getType() === 'idp')
-                {
-                    $idpMDUIparent = $e;
-                }
-                elseif ($e->getType() === 'sp')
-                {
-                    $spMDUIparent = $e;
-                }
-            }
-        }
+
+        $this->updateProviderExtend($ent, $ch);
 
         if (array_key_exists('reqattr', $ch) && strcasecmp($type, 'IDP') != 0)
         {
@@ -158,18 +611,18 @@ class Providerupdater
             foreach ($trs as $tr)
             {
                 $keyid = $tr->getAttribute()->getId();
-                if(array_key_exists($keyid, $origAttrReqs))
+                if (array_key_exists($keyid, $origAttrReqs))
                 {
-                    log_error('warning',__METHOD__.' found duplicate in attr req for entityid:'.$ent->getEntityId());
-                     $trs->removeElement($tr);
-                     $this->em->remove($tr);
-                     continue;
+                    log_error('warning', __METHOD__ . ' found duplicate in attr req for entityid:' . $ent->getEntityId());
+                    $trs->removeElement($tr);
+                    $this->em->remove($tr);
+                    continue;
                 }
-                
-                $origAttrReqs[''.$keyid.''] = $tr;
+
+                $origAttrReqs['' . $keyid . ''] = $tr;
             }
-            
-            
+
+
             foreach ($ch['reqattr'] as $newAttrReq)
             {
                 $alreadyDefined = false;
@@ -184,7 +637,7 @@ class Providerupdater
                 }
                 if (array_key_exists($idCheck, $origAttrReqs))
                 {
-                   
+
                     if ($alreadyDefined)
                     {
                         $trs->removeElement($origAttrReqs['' . $idCheck . '']);
@@ -197,9 +650,8 @@ class Providerupdater
                         $this->em->persist($origAttrReqs['' . $idCheck . '']);
                         unset($origAttrReqs['' . $idCheck . '']);
                     }
-                    
                 }
-                elseif(!$alreadyDefined && isset($attributes['' . $idCheck . '']))
+                elseif (!$alreadyDefined && isset($attributes['' . $idCheck . '']))
                 {
                     log_message('debug', __METHOD__ . ' OKA: new reqattr');
                     $nreq = new models\AttributeRequirement;
@@ -215,7 +667,7 @@ class Providerupdater
             }
             foreach ($origAttrReqs as $orv)
             {
-               
+
                 $trs->removeElement($orv);
                 $this->em->remove($orv);
             }
@@ -223,15 +675,7 @@ class Providerupdater
 
         if ($type !== 'SP')
         {
-            if (empty($idpMDUIparent))
-            {
-                $idpMDUIparent = new models\ExtendMetadata;
-                $idpMDUIparent->setType('sp');
-                $idpMDUIparent->setNamespace('mdui');
-                $idpMDUIparent->setElement('UIInfo');
-                $ent->setExtendMetadata($idpMDUIparent);
-                $this->em->persist($idpMDUIparent);
-            }
+
 
             /**
              * set scopes
@@ -280,15 +724,8 @@ class Providerupdater
                 $origscopesso = null;
             }
         }
-        if ($type !== 'IDP')
-        {
-            $spMDUIparent = new models\ExtendMetadata;
-            $spMDUIparent->setType('sp');
-            $spMDUIparent->setNamespace('mdui');
-            $spMDUIparent->setElement('UIInfo');
-            $ent->setExtendMetadata($spMDUIparent);
-            $this->em->persist($spMDUIparent);
-        }
+
+
         if (array_key_exists('entityid', $ch) && !empty($ch['entityid']))
         {
             if (!empty($entid))
@@ -403,21 +840,28 @@ class Providerupdater
             }
             if (array_key_exists('registrationdate', $ch))
             {
-                $prevregdate = $ent->getRegistrationDate();
+                $prevregistrationdate = $ent->getRegistrationDate();
                 if (isset($prevregdate))
                 {
-                    $prevregdate = date('Y-m-d', $prevregdate->format('U') + j_auth::$timeOffset);
+                    $prevregdate = date('Y-m-d', $prevregistrationdate->format('U') + j_auth::$timeOffset);
+                    $prevregtime = date('H:i', $prevregistrationdate->format('U') + j_auth::$timeOffset);
                 }
                 else
                 {
                     $prevregdate = '';
+                    $prevregtime = '';
                 }
-                if ($prevregdate !== $ch['registrationdate'])
+                if(!array_key_exists('registrationtime',$ch) || empty($ch['registrationtime']))
                 {
-                    $m['RegistrationDate'] = array('before' => $prevregdate, 'after' => $ch['registrationdate']);
+                    $tmpnow =  new \DateTime('now');
+                    $ch['registrationtime'] = $tmpnow->format('H:i');
+                }
+                if ($prevregdate !== $ch['registrationdate'] || $prevregtime !== $ch['registrationtime'])
+                {
+                    $m['RegistrationDate'] = array('before' => $prevregdate.' '.$prevregdate, 'after' => ''.$ch['registrationdate'].' '. $ch['registrationtime'].'' );
                     if (!empty($ch['registrationdate']))
                     {
-                        $ent->setRegistrationDate(\DateTime::createFromFormat('Y-m-d H:i:s', $ch['registrationdate'] . ' 00:00:00'));
+                        $ent->setRegistrationDate(\DateTime::createFromFormat('Y-m-d H:i', $ch['registrationdate'] . ' '.$ch['registrationtime']));
                     }
                     else
                     {
@@ -520,169 +964,7 @@ class Providerupdater
             }
             $ent->setPrivacyUrl($ch['privacyurl']);
         }
-        if (array_key_exists('prvurl', $ch))
-        {
-            if ($type !== 'IDP')
-            {
-                $origex = array();
-                $origs = array();
-                if (isset($extend['sp']['mdui']['PrivacyStatementURL']))
-                {
-                    foreach ($extend['sp']['mdui']['PrivacyStatementURL'] as $v)
-                    {
-                        $l = $v->getAttributes();
-                        $origex['' . $l['xml:lang'] . ''] = $v;
-                        $origs['' . $l['xml:lang'] . ''] = $v->getElementValue();
-                    }
-                }
-                $newex = array();
-                if (isset($ch['prvurl']['spsso']))
-                {
-                    $newex = $ch['prvurl']['spsso'];
-                    foreach ($origex as $key => $value)
-                    {
-                        if (array_key_exists($key, $ch['prvurl']['spsso']))
-                        {
-                            if (empty($ch['prvurl']['spsso']['' . $key . '']))
-                            {
-                                $value->setProvider(NULL);
-                                $ex->removeElement($value);
-                                $this->em->remove($value);
-                                unset($newex['' . $key . '']);
-                            }
-                            else
-                            {
-                                $value->setValue($ch['prvurl']['spsso']['' . $key . '']);
-                                $this->em->persist($value);
-                            }
-                            unset($ch['prvurl']['spsso']['' . $key . '']);
-                        }
-                        else
-                        {
-                            $value->setProvider(NULL);
-                            $ex->removeElement($value);
-                            $this->em->remove($value);
-                            unset($newex['' . $key . '']);
-                            unset($ch['prvurl']['spsso']['' . $key . '']);
-                        }
-                    }
 
-                    foreach ($ch['prvurl']['spsso'] as $key2 => $value2)
-                    {
-                        if (!empty($value2))
-                        {
-                            $nprvurl = new models\ExtendMetadata();
-                            $nprvurl->setType('sp');
-                            $nprvurl->setNamespace('mdui');
-                            $nprvurl->setElement('PrivacyStatementURL');
-                            $nprvurl->setAttributes(array('xml:lang' => $key2));
-                            $nprvurl->setValue($value2);
-                            $ent->setExtendMetadata($nprvurl);
-                            $nprvurl->setParent($spMDUIparent);
-                            $this->em->persist($nprvurl);
-                        }
-                    }
-                    $prvurldiffs = FALSE;
-                    $diff1 = array_diff_assoc($origs, $newex);
-                    if (count($diff1) > 0)
-                    {
-                        $prvurldiffs = TRUE;
-                    }
-                    else
-                    {
-                        $diff1 = array_diff_assoc($newex, $origs);
-                        if (count($diff1) > 0)
-                        {
-                            $prvurldiffs = TRUE;
-                        }
-                    }
-                    if ($prvurldiffs === TRUE)
-                    {
-                        $m['Privacy Statement URLs (SP)'] = array('before' => arrayWithKeysToHtml($origs), 'after' => arrayWithKeysToHtml($newex));
-                    }
-                }
-            }
-            if ($type !== 'SP')
-            {
-                $origex = array();
-                $origs = array();
-                if (isset($extend['idp']['mdui']['PrivacyStatementURL']))
-                {
-                    foreach ($extend['idp']['mdui']['PrivacyStatementURL'] as $v)
-                    {
-                        $l = $v->getAttributes();
-                        $origex['' . $l['xml:lang'] . ''] = $v;
-                        $origs['' . $l['xml:lang'] . ''] = $v->getElementValue();
-                    }
-                }
-                $newex = array();
-                if (isset($ch['prvurl']['idpsso']))
-                {
-                    $newex = $ch['prvurl']['idpsso'];
-                    foreach ($origex as $key => $value)
-                    {
-                        if (array_key_exists($key, $ch['prvurl']['idpsso']))
-                        {
-                            if (empty($ch['prvurl']['idpsso']['' . $key . '']))
-                            {
-                                $value->setProvider(NULL);
-                                $ex->removeElement($value);
-                                $this->em->remove($value);
-                                unset($newex['' . $key . '']);
-                            }
-                            else
-                            {
-                                $value->setValue($ch['prvurl']['idpsso']['' . $key . '']);
-                                $this->em->persist($value);
-                            }
-                            unset($ch['prvurl']['idpsso']['' . $key . '']);
-                        }
-                        else
-                        {
-                            $value->setProvider(NULL);
-                            $ex->removeElement($value);
-                            $this->em->remove($value);
-                            unset($newex['' . $key . '']);
-                            unset($ch['prvurl']['idpsso']['' . $key . '']);
-                        }
-                    }
-
-                    foreach ($ch['prvurl']['idpsso'] as $key2 => $value2)
-                    {
-                        if (!empty($value2))
-                        {
-                            $nprvurl = new models\ExtendMetadata();
-                            $nprvurl->setType('idp');
-                            $nprvurl->setNamespace('mdui');
-                            $nprvurl->setElement('PrivacyStatementURL');
-                            $nprvurl->setAttributes(array('xml:lang' => $key2));
-                            $nprvurl->setValue($value2);
-                            $ent->setExtendMetadata($nprvurl);
-                            $nprvurl->setParent($idpMDUIparent);
-                            $this->em->persist($nprvurl);
-                        }
-                    }
-                    $prvurldiffs = FALSE;
-                    $diff1 = array_diff_assoc($origs, $newex);
-                    if (count($diff1) > 0)
-                    {
-                        $prvurldiffs = TRUE;
-                    }
-                    else
-                    {
-                        $diff1 = array_diff_assoc($newex, $origs);
-                        if (count($diff1) > 0)
-                        {
-                            $prvurldiffs = TRUE;
-                        }
-                    }
-                    if ($prvurldiffs === TRUE)
-                    {
-                        $m['Privacy Statement URLs (IdP)'] = array('before' => arrayWithKeysToHtml($origs), 'after' => arrayWithKeysToHtml($newex));
-                    }
-                }
-            }
-        }
 
         /**
          * START update protocols enumeration
@@ -1534,7 +1816,6 @@ class Providerupdater
                 {
                     foreach ($v1 as $k2 => $v2)
                     {
-                        log_message('debug', 'GG --- ncert spsso ' . serialize(array_keys($v2)));
                         $ncert = new models\Certificate();
                         $ncert->setType('spsso');
                         $ncert->setCertType();
@@ -1550,7 +1831,6 @@ class Providerupdater
                 {
                     foreach ($v1 as $k2 => $v2)
                     {
-                        log_message('debug', 'GG --- ncert idpsso ' . serialize(array_keys($v2)));
                         $ncert = new models\Certificate();
                         $ncert->setType('idpsso');
                         $ncert->setCertType();
@@ -1566,7 +1846,6 @@ class Providerupdater
                 {
                     foreach ($v1 as $k2 => $v2)
                     {
-                        log_message('debug', 'GG --- ncert aa ' . serialize(array_keys($v2)));
                         $ncert = new models\Certificate();
                         $ncert->setType('aa');
                         $ncert->setCertType();
@@ -1574,7 +1853,7 @@ class Providerupdater
                         $ent->setCertificate($ncert);
                         $ncert->setProvider($ent);
                         $ncert->setKeyname($v2['keyname']);
-                        $ncert->setCertData($v2['certdata']);
+                        $ncert->setCertData(getPem($v2['certdata']));
                         $this->em->persist($ncert);
                     }
                 }
@@ -1651,350 +1930,7 @@ class Providerupdater
             }
         }
 
-        /**
-         * start update UII
-         */
-        if ($type !== 'SP')
-        {
-            $typeFilter = array('idp');
-            $idpextend = $ent->getExtendMetadata()->filter(
-                    function(models\ExtendMetadata $entry) use ($typeFilter) {
-                return in_array($entry->getType(), $typeFilter);
-            });
 
-
-
-
-            $doFilter = array('t' => array('idp'), 'n' => array('mdui'), 'e' => array('DisplayName', 'Description', 'InformationURL'));
-            $e = $ent->getExtendMetadata()->filter(
-                    function(models\ExtendMetadata $entry) use ($doFilter) {
-                return in_array($entry->getType(), $doFilter['t']) && in_array($entry->getNamespace(), $doFilter['n']) && in_array($entry->getElement(), $doFilter['e']);
-            });
-            $exarray = array();
-            foreach ($e as $v)
-            {
-                $l = $v->getAttributes();
-                if (isset($l['xml:lang']))
-                {
-                    $exarray['' . $v->getElement() . '']['' . $l['xml:lang'] . ''] = $v;
-                }
-                else
-                {
-                    log_message('error', 'ExentedMetadata element with id:' . $v->getId() . ' doesnt contains xml:lang attr');
-                }
-            }
-            $mduiel = array('displayname' => 'DisplayName', 'desc' => 'Description', 'helpdesk' => 'InformationURL');
-            foreach ($mduiel as $elkey => $elvalue)
-            {
-                if (isset($ch['uii']['idpsso']['' . $elkey . '']) && is_array($ch['uii']['idpsso']['' . $elkey . '']))
-                {
-                    log_message('debug', 'PKS ' . $elkey);
-                    $doFilter = array('' . $elvalue . '');
-                    $collection = $ent->getExtendMetadata()->filter(
-                            function(models\ExtendMetadata $entry) use ($doFilter) {
-                        return ($entry->getType() === 'idp') && ($entry->getNamespace() === 'mdui') && in_array($entry->getElement(), $doFilter);
-                    });
-                    foreach ($collection as $c)
-                    {
-                        $attrs = $c->getAttributes();
-                        $lang = $attrs['xml:lang'];
-                        log_message('debug', 'PKS check uii:idpsso:' . $elkey . ':' . $lang);
-                        if (!isset($ch['uii']['idpsso']['' . $elkey . '']['' . $lang . '']))
-                        {
-                            log_message('debug', 'PKS !isset uii:idpsso:' . $elkey . ':' . $lang);
-                            $ent->getExtendMetadata()->removeElement($c);
-                            $this->em->remove($c);
-                        }
-                    }
-                    foreach ($ch['uii']['idpsso']['' . $elkey . ''] as $key3 => $value3)
-                    {
-
-                        if (!isset($exarray['' . $elvalue . '']['' . $key3 . '']) && !empty($value3) && array_key_exists($key3, $langCodes))
-                        {
-                            $newelement = new models\ExtendMetadata;
-                            $newelement->setParent($idpMDUIparent);
-                            $newelement->setType('idp');
-                            $newelement->setNamespace('mdui');
-                            $newelement->setValue($value3);
-                            $newelement->setElement($elvalue);
-                            $newelement->setAttributes(array('xml:lang' => $key3));
-                            $ent->setExtendMetadata($newelement);
-                            $this->em->persist($newelement);
-                        }
-                        elseif (isset($exarray['' . $elvalue . '']['' . $key3 . '']))
-                        {
-                            if (empty($value3))
-                            {
-                                $exarray['' . $elvalue . '']['' . $key3 . '']->setProvider(NULL);
-                                $ent->getExtendMetadata()->removeElement($exarray['' . $elvalue . '']['' . $key3 . '']);
-                                $this->em->remove($exarray['' . $elvalue . '']['' . $key3 . '']);
-                            }
-                            else
-                            {
-                                $exarray['' . $elvalue . '']['' . $key3 . '']->setValue($value3);
-                                $this->em->persist($exarray['' . $elvalue . '']['' . $key3 . '']);
-                            }
-                        }
-                    }
-                }
-            }
-            // logos not updatting value - just remove entry or add new one
-            if (isset($ch['uii']['idpsso']['logo']) && is_array($ch['uii']['idpsso']['logo']))
-            {
-                $doFilter = array('Logo');
-                $collection = $ent->getExtendMetadata()->filter(
-                        function(models\ExtendMetadata $entry) use ($doFilter) {
-                    return ($entry->getType() === 'idp') && ($entry->getNamespace() === 'mdui') && in_array($entry->getElement(), $doFilter);
-                });
-
-                foreach ($collection as $c)
-                {
-                    log_message('debug', 'PKS collection');
-                    $attrs = $c->getAttributes();
-                    $lang = @$attrs['xml:lang'];
-                    $url = $c->getEvalue();
-
-                    $width = $attrs['width'];
-                    $height = $attrs['height'];
-                    $size = $width . 'x' . $height;
-                    $logoid = $c->getId();
-                    if (empty($lang))
-                    {
-                        $lang = 0;
-                    }
-
-                    if (!isset($ch['uii']['idpsso']['logo']['' . $logoid . '']))
-                    {
-                        log_message('debug', 'PKS logo with id:' . $logoid . ' is removed');
-                        $ent->getExtendMetadata()->removeElement($c);
-                        $this->em->remove($c);
-                    }
-                    else
-                    {
-                        unset($ch['uii']['idpsso']['logo']['' . $logoid . '']);
-                    }
-                }
-                foreach ($ch['uii']['idpsso']['logo'] as $ke => $ve)
-                {
-                    if (isset($ve['url']) && isset($ve['lang']) && isset($ve['size']))
-                    {
-                        $canAdd = true;
-                        $nlogo = new models\ExtendMetadata;
-                        $nlogo->setParent($idpMDUIparent);
-                        $nlogo->setType('idp');
-                        $nlogo->setNamespace('mdui');
-                        $nlogo->setValue($ve['url']);
-                        $nlogo->setElement('Logo');
-                        $attrs = array();
-                        if (strcasecmp($ve['lang'], '0') != 0)
-                        {
-                            $attrs['xml:lang'] = $ve['lang'];
-                        }
-                        $size = explode('x', $ve['size']);
-                        if (count($size) == 2)
-                        {
-                            foreach ($size as $sv)
-                            {
-                                if (!is_numeric($sv))
-                                {
-                                    $canAdd = false;
-                                    break;
-                                }
-                            }
-                            $attrs['width'] = $size[0];
-                            $attrs['height'] = $size[1];
-                        }
-                        else
-                        {
-                            $canAdd = false;
-                        }
-                        $nlogo->setAttributes($attrs);
-                        if ($canAdd)
-                        {
-                            $ent->setExtendMetadata($nlogo);
-                            $this->em->persist($nlogo);
-                        }
-                    }
-                    else
-                    {
-                        log_message('warning', __METHOD__ . ' missing url/lang/size of new logo in form - not adding into db');
-                    }
-                }
-            }
-            else
-            {
-                log_message('debug', 'PKS logo array not found in session');
-            }
-        }
-        if ($type !== 'IDP')
-        {
-            $typeFilter = array('sp');
-            $spextend = $ent->getExtendMetadata()->filter(
-                    function(models\ExtendMetadata $entry) use ($typeFilter) {
-                return in_array($entry->getType(), $typeFilter);
-            });
-            $doFilter = array('t' => array('sp'), 'n' => array('mdui'), 'e' => array('DisplayName', 'Description', 'InformationURL'));
-            $e = $ent->getExtendMetadata()->filter(
-                    function(models\ExtendMetadata $entry) use ($doFilter) {
-                return in_array($entry->getType(), $doFilter['t']) && in_array($entry->getNamespace(), $doFilter['n']) && in_array($entry->getElement(), $doFilter['e']);
-            });
-            $exarray = array();
-            foreach ($e as $v)
-            {
-                $l = $v->getAttributes();
-                if (isset($l['xml:lang']))
-                {
-                    $exarray['' . $v->getElement() . '']['' . $l['xml:lang'] . ''] = $v;
-                }
-                else
-                {
-                    log_message('error', 'ExentedMetadata element with id:' . $v->getId() . ' doesnt contains xml:lang attr');
-                }
-            }
-            $mduiel = array('displayname' => 'DisplayName', 'desc' => 'Description', 'helpdesk' => 'InformationURL');
-            foreach ($mduiel as $elkey => $elvalue)
-            {
-                if (isset($ch['uii']['spsso']['' . $elkey . '']) && is_array($ch['uii']['spsso']['' . $elkey . '']))
-                {
-                    $doFilter = array('' . $elvalue . '');
-                    $collection = $ent->getExtendMetadata()->filter(
-                            function(models\ExtendMetadata $entry) use ($doFilter) {
-                        return ($entry->getType() === 'sp') && ($entry->getNamespace() === 'mdui') && in_array($entry->getElement(), $doFilter);
-                    });
-                    foreach ($collection as $c)
-                    {
-                        $attrs = $c->getAttributes();
-                        $lang = $attrs['xml:lang'];
-                        if (!isset($ch['uii']['spsso']['' . $elkey . '']['' . $lang . '']))
-                        {
-                            $ent->getExtendMetadata()->removeElement($c);
-                            $this->em->remove($c);
-                        }
-                    }
-                    foreach ($ch['uii']['spsso']['' . $elkey . ''] as $key3 => $value3)
-                    {
-
-                        if (!isset($exarray['' . $elvalue . '']['' . $key3 . '']) && !empty($value3) && array_key_exists($key3, $langCodes))
-                        {
-                            $newelement = new models\ExtendMetadata;
-                            $newelement->setParent($spMDUIparent);
-                            $newelement->setType('sp');
-                            $newelement->setNamespace('mdui');
-                            $newelement->setValue($value3);
-                            $newelement->setElement($elvalue);
-                            $newelement->setAttributes(array('xml:lang' => $key3));
-                            $ent->setExtendMetadata($newelement);
-                            $this->em->persist($newelement);
-                        }
-                        elseif (isset($exarray['' . $elvalue . '']['' . $key3 . '']))
-                        {
-                            if (empty($value3))
-                            {
-                                $exarray['' . $elvalue . '']['' . $key3 . '']->setProvider(NULL);
-                                $ent->getExtendMetadata()->removeElement($exarray['' . $elvalue . '']['' . $key3 . '']);
-                                $this->em->remove($exarray['' . $elvalue . '']['' . $key3 . '']);
-                            }
-                            else
-                            {
-                                $exarray['' . $elvalue . '']['' . $key3 . '']->setValue($value3);
-                                $this->em->persist($exarray['' . $elvalue . '']['' . $key3 . '']);
-                            }
-                        }
-                    }
-                }
-            }
-            // logos not updatting value - just remove entry or add new one
-            if (isset($ch['uii']['spsso']['logo']) && is_array($ch['uii']['spsso']['logo']))
-            {
-
-                $doFilter = array('Logo');
-                $collection = $ent->getExtendMetadata()->filter(
-                        function(models\ExtendMetadata $entry) use ($doFilter) {
-                    return ($entry->getType() === 'sp') && ($entry->getNamespace() === 'mdui') && in_array($entry->getElement(), $doFilter);
-                });
-
-                foreach ($collection as $c)
-                {
-                    log_message('debug', 'PKS collection');
-                    $attrs = $c->getAttributes();
-                    $lang = @$attrs['xml:lang'];
-                    $url = $c->getEvalue();
-
-                    $width = $attrs['width'];
-                    $height = $attrs['height'];
-                    $size = $width . 'x' . $height;
-                    $logoid = $c->getId();
-                    if (empty($lang))
-                    {
-                        $lang = 0;
-                    }
-
-                    if (!isset($ch['uii']['spsso']['logo']['' . $logoid . '']))
-                    {
-                        log_message('debug', __METHOD__ . ' Logo with id:' . $logoid . ' is removed');
-                        $ent->getExtendMetadata()->removeElement($c);
-                        $this->em->remove($c);
-                    }
-                    else
-                    {
-                        unset($ch['uii']['spsso']['logo']['' . $logoid . '']);
-                    }
-                }
-                foreach ($ch['uii']['spsso']['logo'] as $ke => $ve)
-                {
-                    if (isset($ve['url']) && isset($ve['lang']) && isset($ve['size']))
-                    {
-                        $canAdd = true;
-                        $nlogo = new models\ExtendMetadata;
-                        $nlogo->setParent($idpMDUIparent);
-                        $nlogo->setType('sp');
-                        $nlogo->setNamespace('mdui');
-                        $nlogo->setValue($ve['url']);
-                        $nlogo->setElement('Logo');
-                        $attrs = array();
-                        if (strcasecmp($ve['lang'], '0') != 0)
-                        {
-                            $attrs['xml:lang'] = $ve['lang'];
-                        }
-                        $size = explode('x', $ve['size']);
-                        if (count($size) == 2)
-                        {
-                            foreach ($size as $sv)
-                            {
-                                if (!is_numeric($sv))
-                                {
-                                    $canAdd = false;
-                                    break;
-                                }
-                            }
-                            $attrs['width'] = $size[0];
-                            $attrs['height'] = $size[1];
-                        }
-                        else
-                        {
-                            $canAdd = false;
-                        }
-                        $nlogo->setAttributes($attrs);
-                        if ($canAdd)
-                        {
-                            $ent->setExtendMetadata($nlogo);
-                            $this->em->persist($nlogo);
-                        }
-                    }
-                    else
-                    {
-                        log_message('warning', __METHOD__ . ' missing url/lang/size of new logo in form - not adding into db');
-                    }
-                }
-            }
-            else
-            {
-                log_message('debug', 'PKS logo array not found in session');
-            }
-        }
-        /**
-         * end update UII
-         */
         if (!array_key_exists('usestatic', $ch))
         {
             $ent->setStatic(false);
@@ -2020,16 +1956,12 @@ class Providerupdater
                 }
             }
         }
-
-        if (array_key_exists('use_static', $ch) && $ch['usestatic'] === 'accept')
+        $this->logtracks = array_merge($this->logtracks, $m);
+        if (count($this->logtracks) > 0 && !empty($entid))
         {
-            
+            $this->ci->tracker->save_track('ent', 'modification', $ent->getEntityId(), serialize($this->logtracks), FALSE);
         }
-
-        if (count($m) > 0 && !empty($entid))
-        {
-            $this->ci->tracker->save_track('ent', 'modification', $ent->getEntityId(), serialize($m), FALSE);
-        }
+        $this->logtracks = array();
         return $ent;
     }
 

@@ -111,7 +111,7 @@ class Sync_metadata extends CI_Controller {
         if(!empty($featenabled) && is_array($featenabled) && isset($featenabled['metasync']))
         {
            set_status_header(403);
-           echo 'Denied';
+           echo 'Denied'.PHP_EOL;
            return;
         }
 
@@ -147,18 +147,34 @@ class Sync_metadata extends CI_Controller {
         $fed = $tmp_feds->getOneByUrn($federationurn);
         if (empty($fed))
         {
-            show_error('Federation not found', 404);
+            set_status_header(500);
+            echo 'Federation not found'.PHP_EOL ;
+            return;
         }
+        log_message('debug',__METHOD__.' downloading metadata from '.$url);
+        $time_start = microtime(true);
         $metadata_body = $this->curl->simple_get($url);
+        $time_end = microtime(true);
+        $exectime = $time_end - $time_start;
+        log_message('debug',__METHOD__.' time execustion of downloading metadata from '.$url.' :: '.$exectime.' seconds');
         if (empty($metadata_body))
         {
-            show_error('empty metadata', 404);
+            set_status_header(403);
+            echo 'could not retrieve data from '.$url.PHP_EOL ;
+            return;
         }
         $this->load->library(array('metadata_validator', 'curl', 'metadata2import'));
+        $time_start = microtime(true);
         $is_valid_metadata = $this->metadata_validator->validateWithSchema($metadata_body);
+        $time_end = microtime(true);
+        $exectime = $time_end - $time_start;
+        log_message('debug',__METHOD__.' time execustion of validating metadata  :: '.$exectime.' seconds');
         if (empty($is_valid_metadata))
         {
-            show_error('Metadata is not valid', 500);
+             set_status_header(403);
+             echo 'Metadata from '.$url.' is not valid with Schema'.PHP_EOL;
+             return;
+
         }
 
         $type_of_entities = strtoupper($conditions['type']);
@@ -181,7 +197,11 @@ class Sync_metadata extends CI_Controller {
             'email'=>$conditions['email'],
         );
         $other = null;
+        $time_start = microtime(true);
         $result = $this->metadata2import->import($metadata_body, $type_of_entities, $full, $defaults, $other);
+        $time_end = microtime(true);
+        $exectime = $time_end - $time_start;
+        log_message('debug',__METHOD__.' total time execution of running import metadata  :: '.$exectime.' seconds');
     }
 
 }

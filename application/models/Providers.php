@@ -66,10 +66,9 @@ class Providers {
         }
         return $feds;
     }
-
     public function getSPsForArp(Provider $provider)
     {
-        $query1 = $this->em->createQuery("SELECT m,f FROM models\FederationMembers m JOIN m.federation f WHERE m.provider = ?1 AND m.joinstate != '2' AND m.isDisabled = '0' AND m.isBanned='0' AND f.is_active = '1'");
+        $query1 = $this->em->createQuery("SELECT partial m.{id, federation},partial f.{id} FROM models\FederationMembers m JOIN m.federation f WHERE m.provider = ?1 AND m.joinstate != '2' AND m.isDisabled = '0' AND m.isBanned='0' AND f.is_active = '1'");
         $query1->setParameter(1, $provider->getId());
         $query1->setHint(\Doctrine\ORM\Query::HINT_FORCE_PARTIAL_LOAD, true);
         $result1 = $query1->getResult();
@@ -82,9 +81,8 @@ class Providers {
         {
             return array();
         }
-        $query = $this->em->createQuery("SELECT p,e,m,f FROM models\Provider p LEFT JOIN p.membership m LEFT JOIN m.federation f LEFT JOIN p.extend e WHERE m.federation IN (:feds) AND  m.joinstate != '2' AND m.isDisabled = '0' AND m.isBanned='0' AND p.id != ?2 AND p.is_active = '1' AND p.is_approved = '1' AND p.type IN ('SP','BOTH')");
+        $query = $this->em->createQuery("SELECT partial p.{id, entityid,type,ldisplayname,displayname,lname, name},e,partial m.{id, provider, federation},partial f.{id} FROM models\Provider p LEFT JOIN p.membership m LEFT JOIN m.federation f LEFT JOIN p.extend e WHERE m.federation IN (:feds) AND  m.joinstate != '2' AND m.isDisabled = '0' AND m.isBanned='0' AND  p.type IN ('SP','BOTH') AND  p.is_active = '1' AND p.is_approved = '1'");
         $query->setParameter('feds', $feds);
-        $query->setParameter(2, $provider->getId());
         $query->setHint(\Doctrine\ORM\Query::HINT_FORCE_PARTIAL_LOAD, true);
         $result = $query->getResult();
         $r2 = new \Doctrine\Common\Collections\ArrayCollection;
@@ -97,8 +95,10 @@ class Providers {
 
     public function getIdPsForWayf(Provider $provider)
     {
+        $spid = $provider->getId();
+        $startTime = microtime(true);
         $query1 = $this->em->createQuery("SELECT m,f FROM models\FederationMembers m JOIN m.federation f WHERE m.provider = ?1 AND m.joinstate != '2' AND m.isDisabled = '0' AND m.isBanned='0' AND f.is_active = '1'");
-        $query1->setParameter(1, $provider->getId());
+        $query1->setParameter(1, $spid);
         $query1->setHint(\Doctrine\ORM\Query::HINT_FORCE_PARTIAL_LOAD, true);
         $result1 = $query1->getResult();
         $feds = array();
@@ -110,11 +110,16 @@ class Providers {
         {
             return array();
         }
-        $query = $this->em->createQuery("SELECT p,e,m FROM models\Provider p LEFT JOIN p.extend e LEFT JOIN p.membership m LEFT JOIN m.federation f  WHERE m.federation IN (:feds) AND  m.joinstate != '2' AND m.isDisabled = '0' AND m.isBanned='0' AND p.id != ?2 AND p.is_active = '1' AND p.is_approved = '1' AND p.type IN ('IDP','BOTH')");
+        $currentTime = new \DateTime("now", new \DateTimeZone('UTC'));
+        $query = $this->em->createQuery("SELECT partial p.{id,entityid,type,ldisplayname,lname,name,displayname},e, partial m.{id} FROM models\Provider p LEFT JOIN p.extend e LEFT JOIN p.membership m LEFT JOIN m.federation f  WHERE m.federation IN (:feds) AND  m.joinstate != '2' AND m.isDisabled = '0' AND m.isBanned='0' AND p.id != ?2 AND p.is_active = '1' AND p.is_approved = '1' AND (p.validto is null OR p.validto >= :now) AND (p.validfrom is null OR p.validfrom <= :now) AND p.type IN ('IDP','BOTH')");
         $query->setParameter('feds', $feds);
-        $query->setParameter(2, $provider->getId());
+        $query->setParameter(2, $spid);
+        $query->setParameter('now', $currentTime);
         $query->setHint(\Doctrine\ORM\Query::HINT_FORCE_PARTIAL_LOAD, true);
         $result = $query->getResult();
+        $endTime = microtime(true);
+        $execTime = $endTime-$startTime;
+        \log_message('info',__METHOD__.' time execution: '.$execTime);
         return $result;
     }
 
@@ -350,7 +355,6 @@ class Providers {
         $query->setHint(\Doctrine\ORM\Query::HINT_FORCE_PARTIAL_LOAD, true);
         return $query->getResult();
     }
-
     public function getIdpsLightLocal()
     {
         log_message('debug', 'run: models\Providers::getIdpsLightLocal()');
@@ -367,6 +371,17 @@ class Providers {
         $query = $this->em->createQuery($dql);
         $query->setHint(\Doctrine\ORM\Query::HINT_FORCE_PARTIAL_LOAD, true);
         return $query->getResult();
+    }
+
+    public function getProvidersListPartialInfo($type)
+    {
+        $dql = "SELECT partial p.{id,entityid,name,lname,displayname,ldisplayname,type,helpdeskurl,lhelpdeskurl,registerdate,validfrom,validto,is_approved,is_active,is_locked,is_local,hidepublic},a FROM models\Provider p LEFT OUTER JOIN p.extend a  WHERE p.type IN (?1,?2)";
+        $query = $this->em->createQuery($dql);
+        $query->setParameter(1, ''.$type.'');
+        $query->setParameter(2, 'BOTH');
+        $query->setHint(\Doctrine\ORM\Query::HINT_FORCE_PARTIAL_LOAD, true);
+        return $query->getResult();
+
     }
 
     /**
@@ -517,23 +532,6 @@ class Providers {
         return $this->providers;
     }
 
-    public function test_getIdps()
-    {
-        $rsm = new ResultSetMapping;
-        $rsm->addEntityResult('models\Provider', 'u');
-        $rsm->addFieldResult('u', 'id', 'id');
-        $rsm->addFieldResult('u', 'name', 'name');
-        $query = $this->em->createNativeQuery('SELECT id,name FROM provider WHERE type = ?', $rsm);
-        $query->setParameter(1, 'SP');
-
-        $users = $query->getResult();
-
-        return $users;
-    }
-
-
-
-
     public function getActiveFederationmembersForExport(Federation $federation, $excludeType=null)
     {
        if(is_null($excludeType))
@@ -667,10 +665,5 @@ class Providers {
         return $this->providers;
     }
 
-    public function getFromXML($metadata)
-    {
-        $doc = \DOMDocument::loadXML($metadata);
-        return $doc->saveXML($doc);
-    }
 
 }

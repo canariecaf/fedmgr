@@ -426,7 +426,7 @@ class Manage extends MY_Controller
         $data['content_view'] = 'federation/federation_show_view';
         if (!$canEdit)
         {
-            $editLink = '<img src="' . base_url() . 'images/icons/pencil-prohibition.png" title="' . lang('rr_nopermission') . '"/>';
+            $editLink = '<span class="alert"><i class="fi-prohibited"></i></span>';
         }
         else
         {
@@ -978,7 +978,6 @@ class Manage extends MY_Controller
 
     public function removeprovider($fed_name)
     {
-        log_message('debug', 'DDDUPA');
         if (!$this->j_auth->logged_in())
         {
             redirect('auth/login', 'location');

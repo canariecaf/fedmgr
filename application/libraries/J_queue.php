@@ -87,7 +87,7 @@ class J_queue
             log_message('error', __METHOD__ . ' data doesnt contain information about username/email');
             return false;
         }
-        $checkuser = $this->em->createQuery("SELECT u FROM models\User u WHERE u.username = '{$objdata['username']}' OR u.email = '{$objdata['email']}'")->getResult();
+        $checkuser = $this->em->createQuery("SELECT u FROM models\User u WHERE u.username = '{$objdata['username']}'")->getResult();
 
 
         if ($checkuser)
@@ -183,6 +183,7 @@ class J_queue
         {
             $r[] = array('name' => lang('requestor'), 'value' => lang('unknown'));
         }
+        $r[] = array('name'=>lang('rr_sourceip'),'value'=>$q->getIP());
         $entityid = $q->getName();
         $provider = $this->em->getRepository("models\Provider")->findOneBy(array('entityid' => $entityid));
 
@@ -236,6 +237,7 @@ class J_queue
         {
             $r[] = array('name' => lang('requestor'), 'value' => lang('unknown'));
         }
+        $r[] = array('name'=>lang('rr_sourceip'),'value'=>$q->getIP());
         $entityid = $q->getName();
         $provider = $this->em->getRepository("models\Provider")->findOneBy(array('entityid' => $entityid));
 
@@ -276,6 +278,7 @@ class J_queue
         $objdata = $q->getData();
         $r = array();
         $r[] = array('header' => lang('request'));
+	$r[] = array('name'=>lang('rr_sourceip'),'value'=>$q->getIP());
         $r[] = array('name' => lang('type'), 'value' => lang('req_userregistration'));
         $creator = $q->getCreator();
         if ($creator)
@@ -334,12 +337,13 @@ class J_queue
         $creator = $q->getCreator();
         if ($creator)
         {
-            $fedrows[] = array('name' => lang('requestor'), 'value' => $creator->getUsername());
+            $fedrows[] = array('name' => lang('requestor'), 'value' => $creator->getFullname() .' ('. $creator->getUsername() .')');
         }
         else
         {
             $fedrows[] = array('name' => lang('requestor'), 'value' => lang('unknown'));
         }
+        $fedrows[] = array('name'=>lang('rr_sourceip'),'value'=>$q->getIP());
 
         $fedrows[] = array('name' => lang('rr_regdate'), 'value' => $q->getCreatedAt());
         $fedrows[] = array('header' => lang('rr_basicinformation'));
@@ -372,7 +376,7 @@ class J_queue
         {
             $fedrows[] = array('name' => lang('requestor'), 'value' => lang('unknown'));
         }
-
+        $fedrows[] = array('name'=>lang('rr_sourceip'),'value'=>$q->getIP());
         $fedrows[] = array('name' => lang('rr_requestdate'), 'value' => $q->getCreatedAt());
         $fedrows[] = array('header' => lang('rr_basicinformation'));
         $fedrows[] = array('name' => lang('rr_fed_name'), 'value' => $objData->getName());
@@ -435,6 +439,18 @@ class J_queue
         $feds = $objData->getFederations();
         $fedIdsCollection = array();
 
+        $dataRows[$i++]['header'] = lang('rr_details');
+        $dataRows[$i]['name'] = lang('requestor');
+        $creatorUN = 'anonymous';
+        $creatorFN = 'Anonymous';
+        $creator = $q->getCreator();
+        if(!empty($creator)) {
+                $creatorUN = $creator->getUsername();
+                $creatorFN = $creator->getFullname();
+        }
+        $dataRows[$i++]['value'] = "$creatorFN ($creatorUN)";
+        $dataRows[$i++] = array('name'=>lang('rr_sourceip'),'value'=>$q->getIP());
+
         $dataRows[$i++]['header'] = lang('rr_fedstojoin');
         if ($feds->count() > 0)
         {
@@ -486,7 +502,7 @@ class J_queue
                 {
                     $hidden = array('fedid' => $v->getFederation()->getId(), 'qtoken' => $q->getToken(), 'fvid' => $v->getId());
                     $valMandatory .= form_open(base_url() . 'federations/fvalidator/validate', $attrs, $hidden);
-                    $valMandatory .= '<button id="' . $v->getId() . '" title="' . $v->getDescription() . '">' . $v->getName() . '</button> ';
+                    $valMandatory .= '<button id="' . $v->getId() . '" title="' . $v->getDescription() . '" name="mandatory">' . $v->getName() . '</button> ';
                     $valMandatory .= form_close();
                 }
                 else
@@ -628,6 +644,8 @@ class J_queue
         $this->ci->table->add_row($cell);
         $cell = array(lang('requestor'), $queue->getCreator()->getUsername() . ' (' . $queue->getCreator()->getFullname() . ') : email: ' . $queue->getCreator()->getEmail());
         $this->ci->table->add_row($cell);
+        $cell = array(lang('rr_sourceip'),''.$queue->getIP().'');
+        $this->ci->table->add_row($cell);
         $cell = array(lang('rr_federation'), $queue->getName());
         $this->ci->table->add_row($cell);
         $cell = array(lang('rr_provider'), $provider->getName());
@@ -668,8 +686,11 @@ class J_queue
         $this->ci->table->add_row($cell);
         $cell = array('data' => lang('rr_details'), 'class' => 'highlight', 'colspan' => 2);
         $this->ci->table->add_row($cell);
-        $cell = array(lang('requestor'), $queue->getCreator()->getUsername() . ' (' . $queue->getCreator()->getFullname() . ') : email: ' . $queue->getCreator()->getEmail());
+        $cell = array(lang('requestor'), $queue->getCreator()->getFullname() . ' (' . $queue->getCreator()->getUsername() . ')');
         $this->ci->table->add_row($cell);
+        $cell = array(lang('rr_sourceip'), $queue->getIP());
+        $this->ci->table->add_row($cell);
+
         $validators = $federation->getValidators();
         $fedValidator = null;
         foreach ($validators as $v)
@@ -703,7 +724,7 @@ class J_queue
                 {
                     $hidden = array('fedid' => $federation->getId(), 'provid' => $provider->getId(), 'fvid' => $v->getId());
                     $valMandatory .= form_open(base_url() . 'federations/fvalidator/validate', $attrs, $hidden);
-                    $valMandatory .= '<button id="' . $v->getId() . '" title="' . $v->getDescription() . '">' . $v->getName() . '</button> ';
+                    $valMandatory .= '<button id="' . $v->getId() . '" title="' . $v->getDescription() . '" name="mandatory">' . $v->getName() . '</button> ';
                     $valMandatory .= form_close();
                 }
                 else
@@ -723,6 +744,12 @@ class J_queue
         $this->ci->table->add_row($cell);
         $data = $queue->getData();
         $cell = array(lang('rr_provider'), $data['name']);
+        $this->ci->table->add_row($cell);
+        $cell = array(lang('rr_entityid'), $data['entityid']);
+        $this->ci->table->add_row($cell);
+        
+
+      $cell = array('Provider status','<div  data-jagger-getmoreajax= "'.base_url().'providers/detail/status/'.$data['id'].'" data-jagger-response-msg="providerstatus"></div><div id="providerstatus" data-alert class="alert-box info">'.lang('rr_noentitywarnings').'</div>');
         $this->ci->table->add_row($cell);
         $cell = array(lang('request'), lang('acceptprovtofed'));
         $this->ci->table->add_row($cell);

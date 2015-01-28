@@ -5,7 +5,12 @@
         <ul class="title-area">
             <li class="menu">
                 <?php
-                echo '<a href="' . $base_url . '"><img src="' . $base_url . 'images/' . $this->config->item('site_logo') . '" alt="Logo" style="max-height: 40px; background-color: white; margin-top: 2px"/></a>';
+                $siteLogo = $this->config->item('site_logo');
+                if(empty($siteLogo))
+                {
+                   $siteLogo = 'logo-default.png';
+                }
+                echo '<a href="' . $base_url . '"><img src="' . $base_url . 'images/' . $siteLogo . '" alt="Logo" style="max-height: 40px; margin-top: 2px; padding-right: 5px;"/></a>';
                 ?>
 
             </li>
@@ -60,7 +65,7 @@
                 {
                 ?>
                     <li class="has-form">
-                        <a href="<?php echo $base_url; ?>auth/" class="button alert logibutton"  data-reveal-id="loginform"><?php echo lang('toploginbtn'); ?></a>
+                        <a href="<?php echo $base_url; ?>auth/" class="button alert"  id="loginbtn" data-reveal-id="loginform"><?php echo lang('toploginbtn'); ?></a>
                     </li>
 
                     <?php
@@ -139,6 +144,7 @@
                                 echo '<li><a href="' . $base_url . 'smanage/reports">' . lang('sys_menulink') . '</a></li>';
                             }
                             ?>
+                            <li><a href="<?php echo $base_url; ?>tools/addontools/show"><?php echo lang('addons_menulink'); ?></a></li>
                             <li><a href="<?php echo $base_url; ?>manage/fedcategory/show"><?php echo lang('rrfedcatslist'); ?></a></li>
                             <li class="divider"></li>
                             <li><a href="<?php echo $base_url; ?>manage/ec/show"><?php echo lang('entcats_menulink'); ?></a></li>
@@ -160,6 +166,7 @@
                                 </li>
                                 <?php
                                 echo '<li><a href="' . $base_url . 'manage/spage/showall">' . lang('rr_articlesmngmt') . '</a></li>';
+                                echo '<li><a href="' . $base_url . 'manage/mailtemplates/showlist">' . lang('rr_mailtemplmngmt') . '</a></li>';
                                 
                             }
                             ?>

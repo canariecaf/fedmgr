@@ -218,6 +218,8 @@ class Metadata2array
             }
             elseif ($gnode->nodeName === 'md:AttributeAuthorityDescriptor' || $gnode->nodeName === 'AttributeAuthorityDescriptor')
             {
+                $isIdp = true;
+                $entity['type'] = 'IDP';
                 $entity['details']['aadescriptor'] = $this->attributeAuthorityDescriptorConvert($gnode);
             }
             elseif ($gnode->nodeName === 'Extensions' || $gnode->nodeName === 'md:Extensions')
@@ -511,6 +513,7 @@ class Metadata2array
 
     private function extensionsToArray(\DOMElement $node)
     {
+        $ext = array();
         foreach ($node->childNodes as $enode)
         {
             if ($enode->nodeName === 'shibmd:Scope' || $enode->nodeName === 'Scope' || $enode->nodeName === 'saml1md:Scope')
@@ -560,7 +563,6 @@ class Metadata2array
             }
             elseif ($enode->nodeName === 'mdui:DiscoHints' && $enode->hasChildNodes())
             {
-                log_message('debug', 'GK : DiscoHints found');
                 foreach ($enode->childNodes as $agnode)
                 {
                     $geovalue = array();
@@ -583,12 +585,16 @@ class Metadata2array
                             }
                         }
                     }
+                    elseif ($agnode->nodeName == 'mdui:IPHint')
+                    {
+                        $ext['iphint'][] = $agnode->nodeValue;
+                    }
+                    elseif($agnode->nodeName == 'mdui:DomainHint')
+                    {
+                        $ext['domainhint'][] = $agnode->nodeValue;
+                    }
                 }
             }
-        }
-        if (empty($ext))
-        {
-            $ext = array();
         }
         return $ext;
     }

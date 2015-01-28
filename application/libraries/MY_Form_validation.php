@@ -31,6 +31,12 @@ class MY_form_validation extends CI_form_validation {
     }
 
 
+    public function xss_clean($str)
+    {
+	return $this->CI->security->xss_clean($str);
+    }
+
+
 
     function str_matches_array( $str, $ar)
     {
@@ -100,6 +106,68 @@ class MY_form_validation extends CI_form_validation {
         log_message('debug','HHH : func'.serialize($s));
         $this->set_message('valid_contact', "%s :  contains incorrect characters");
         return false;
+    }
+
+    function valid_domain($domain) 
+    {
+ 	$result =  preg_match('/^ (?: [a-z0-9] (?:[a-z0-9\-]* [a-z0-9])? \. )* [a-z0-9] (?:[a-z0-9\-]* [a-z0-9])?  \. [a-z]{2,6} $ /ix', $domain);
+        if($result)
+        {
+          return TRUE;
+        }
+        $this->set_message('valid_domain', "%s :  invalid domain: ".htmlentities($domain));
+        return FALSE;
+    
+    }
+   
+    function valid_ip_with_prefix($str)
+    {
+         $ip = substr($str,0,strpos($str.'/','/'));
+         $range = substr($str,strpos($str.'/','/')+1);
+         if(empty($range) || !ctype_digit($range))
+         {
+             $this->set_message('valid_ip_with_prefix', '%s: '. htmlentities($str) .' missing or invalid  prefix');          
+             return FALSE;
+         }
+
+         $isIPV4 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE);
+         $isIPV6 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 | FILTER_FLAG_NO_PRIV_RANGE);
+         if($isIPV4 !== FALSE)
+         {
+              
+              if($range <= 32 && $range > 0)
+              {
+                 return TRUE;
+              } 
+              else
+              {
+                  $this->set_message('valid_ip_with_prefix','%s: '. htmlentities($str) .': incorrect  network prefix for IPV4');          
+                  return FALSE;
+              }
+         }        
+         elseif($isIPV6 !== FALSE)
+         {
+              if($range <= 64 && $range >= 24)
+              {
+                 return TRUE;
+              } 
+              else
+              {
+                  $this->set_message('valid_ip_with_prefix','%s: '. htmlentities($str) .': incorrect  network prefix IPV6');          
+                  return FALSE;
+              }
+
+
+         }         
+         else
+         {
+                  $this->set_message('valid_ip_with_prefix','%s: '. htmlentities($str) .': invalid IP or IP is from private network range');          
+                  return FALSE;
+
+         }
+ 
+         
+
     }
 
     
@@ -243,6 +311,50 @@ class MY_form_validation extends CI_form_validation {
            return false;
         }
 
+    }
+    function mailtemplate_unique($group,$field)
+    {
+        if(isset($this->_field_data[$field], $this->_field_data[$field]['postdata']))
+        {
+            $lang = $this->_field_data[$field]['postdata'];
+        }
+        else
+        {
+            return TRUE;
+
+        }
+
+        $l = $this->em->getRepository("models\MailLocalization")->findOneBy(array('mgroup'=>$group,'lang'=>$lang));
+        if(!empty($l))
+        {
+            $this->set_message('mailtemplate_unique', 'Templeate with specidi lang exist for ');
+            return FALSE;
+        }
+        return TRUE;
+    }
+    function mailtemplate_isdefault($isdefault,$field)
+    {
+        if(isset($this->_field_data[$field], $this->_field_data[$field]['postdata']))
+        {
+            $group = $this->_field_data[$field]['postdata'];
+        }
+        else
+        {
+            return TRUE;
+
+        }
+        if(!empty($isdefault) || strcmp($isdefault,'yes')!=0)
+        {
+            return TRUE;
+        }
+
+        $l = $this->em->getRepository("models\MailLocalization")->findOneBy(array('mgroup'=>$group,'isdefault'=>TRUE));
+        if(!empty($l))
+        {
+            $this->set_message('mailtemplate_isdefault', 'Templeate with specidi group already has default ');
+            return FALSE;
+        }
+        return TRUE;
     }
  
     function attribute_unique($value,$name)

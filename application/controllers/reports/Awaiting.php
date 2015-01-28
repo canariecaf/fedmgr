@@ -161,6 +161,7 @@ class Awaiting extends MY_Controller
         foreach ($queueArray as $q)
         {
             $c_creator = 'anonymous';
+            $c_creatorCN = 'Anonymous';
             $creator = $q->getCreator();
             $access = $this->hasQAccess($q);
             if (!$access)
@@ -170,6 +171,7 @@ class Awaiting extends MY_Controller
             if (!empty($creator))
             {
                 $c_creator = $creator->getUsername();
+                $c_creatorCN = $creator->getFullname();
             }
             $recipientid = $q->getRecipient();
             $recipenttype = $q->getRecipientType();
@@ -187,6 +189,7 @@ class Awaiting extends MY_Controller
                 $result['q'][$kid++] = array(
                     'issubscription'=>0,
                     'requester' => $c_creator,
+                    'requesterCN' => $c_creatorCN,
                     'idate' => $q->getCreatedAt(),
                     'datei' => $q->getCreatedAt(),
                     'iname' => $q->getCN(),
@@ -386,6 +389,7 @@ class Awaiting extends MY_Controller
                 'error_message' => lang('rerror_qid_noexist')
             );
             $this->load->view('page', $dataview);
+            return;
         }
         $objType = $qObject->getObjType();
         $objAction = $qObject->getAction();
@@ -487,6 +491,7 @@ class Awaiting extends MY_Controller
             );
         }
         $this->load->view('page', $dataview);
+        return;
     }
 
     private function deleteFederation(\models\Queue $q)
@@ -650,9 +655,12 @@ class Awaiting extends MY_Controller
             $additionalReceipents[] = $requester_recipient;
         }
         $this->email_sender->addToMailQueue(array('greqisterreq', 'gidpregisterreq'), null, $sbj, $body, $additionalReceipents, FALSE);
+        $this->load->library('j_ncache');
         try
         {
             $this->em->flush();
+            $this->j_ncache->cleanProvidersList('idp');
+            $this->j_ncache->cleanProvidersList('sp');
             return true;
         }
         catch (Exception $e)
