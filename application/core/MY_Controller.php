@@ -1,7 +1,11 @@
 <?php
-
 if (!defined('BASEPATH'))
     exit('No direct script access allowed');
+
+
+
+
+
 /**
  * ResourceRegistry3
  * 
@@ -18,25 +22,42 @@ if (!defined('BASEPATH'))
  * @package     RR3
  * @author      Janusz Ulanowski <janusz.ulanowski@heanet.ie>
  */
+
+
+/**
+ * @property CI_Config $config
+ * @property CI_Email $email
+ * @property CI_Encrypt $encrypt
+ * @property CI_Form_validation $form_validation
+ * @property CI_FTP $ftp
+ * @property CI_Input $input
+ * @property CI_Loader $load
+ * @property CI_Parser $parser
+ * @property CI_Session $session
+ * @property CI_Table $table
+ * @property CI_URI $uri
+ * @property CI_Output $output
+ * @property CI_Lang $lang
+ * @property Zacl $zacl
+ * @property J_cache $j_cache
+ * @property Show_element $show_element
+ * @property J_auth $j_auth
+ * @property Doctrine $doctrine
+ * @property CI_Cache $cache
+ */
+
 class MY_Controller extends CI_Controller {
 
-    private $current_user;
-
-    /**
-     * Doctrine entity manager
-     *
-     * @var EntityManager
-     */
-    protected $em;
-    protected $authenticated;
-    protected static $current_language = 'en';
-    public $title;
-    protected $inqueue;
-    public $globalerrors = array();
-    public $globalnotices = array();
     public static $langselect = array();
     public static $menuactive;
+    protected static $current_language = 'en';
     private static $langs;
+    public $title;
+    public $globalerrors = array();
+    public $globalnotices = array();
+    protected $em;
+    protected $authenticated;
+    protected $inqueue;
 
     public function __construct()
     {
