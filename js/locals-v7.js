@@ -1,4 +1,3 @@
-
 jQuery.fn.toggleOption = function (show) {
 
     jQuery(this).toggle(show);
@@ -16,9 +15,11 @@ var createRowWithLangRm = function (langCode, langString, inputName, rmbtn) {
 };
 
 
-
 var BINIT = {
     initFvalidators: function () {
+
+        console.log('BININT');
+
 
         $("ul.validatorbuttons button").on('click', function (e) {
             var link = $(this).attr("value");
@@ -63,8 +64,94 @@ var BINIT = {
 
 var GINIT = {
     initialize: function () {
+        var membership2 = $("#membership2").first();
+        if (membership2 !== undefined && membership2.length > 0) {
+            var link = $(membership2).attr('data-jagger-link');
+            var entgroups = ['idp', 'sp', 'both'];
+            var entgroupkey;
+            var countGroups = [];
+            countGroups['idp'] =0;
+            countGroups['sp'] =0;
+            countGroups['both'] =0 ;
+            $.ajax({
+                url: link,
+                type: 'GET',
+                cache: true,
+                dataType: 'json',
+                success: function (data) {
+                    if (data) {
+                        var preurl = data.definitions.preurl;
+                        var out = [], o = -1;
+                        var nr, oddeven;
+                        out[++o] = '<table><tbody>';
+                        for (var i = 0, total = entgroups.length; i < total; i++) {
+                            entgroupkey = entgroups[i];
+
+                            if (data[entgroupkey]) {
+                                out[++o] = '<tr><td colspan="2" class="highlight">' + data.definitions[entgroupkey] + '</td></tr>';
+                                out[++o] = '<tr><td colspan="2"><div class="zebramembers">';
+                                nr = 0;
+                                countGroups[entgroupkey] = data[entgroupkey].length;
+                                $.each(data[entgroupkey], function (i, v) {
+                                    ++nr;
+
+                                    if (nr % 2) {
+                                        out[++o] = '<div class="small-12 column odd">';
+                                    }
+                                    else {
+                                        out[++o] = '<div class="small-12 column even">';
+                                    }
+
+                                    out[++o] = '<div class="large-5 column">' + nr + '. <a href="' + preurl + v.pid + '">' + v.pname + '</a></div>';
+                                    out[++o] = '<div class="large-5 column">' + v.entityid + '</div>';
+                                    out[++o] = '<div class="large-2 column"></div>';
+
+                                    out[++o] = '</div>';
+
+                                });
+                                out[++o] = '</div></td></tr>';
 
 
+                            }
+
+                        }
+                        out[++o] = '</tbody></table>';
+                        $(membership2).html(out.join(''));
+
+                        var data2 = [
+                            {
+                                value: countGroups.idp,
+                                color: "#F7464A",
+                                highlight: "#FF5A5E",
+                                label: data.definitions.idp
+                            },
+                            {
+                                value: countGroups.sp,
+                                color: "#46BFBD",
+                                highlight: "#5AD3D1",
+                                label: data.definitions.sp
+                            },
+                            {
+                                value: countGroups.both,
+                                color: "#FDB45C",
+                                highlight: "#FFC870",
+                                label: data.definitions.both
+                            }
+                        ];
+
+
+                        var ctx = document.getElementById("fedpiechart").getContext("2d");
+                        if(ctx && (countGroups.idp > 0 || countGroups.sp > 0 ||countGroups.both > 0 )) {
+                            var myPieChart = new Chart(ctx).Pie(data2, {responsive: true, legendTemplate: "<div class=\"<%=name.toLowerCase()%>-legend\"><% for (var i=0; i<segments.length; i++){%><div><span style=\"background-color:<%=segments[i].fillColor%>\">&nbsp;&nbsp;&nbsp;</span> <%if(segments[i].label){%><%=segments[i].label%><%}%></div><%}%></div>"});
+                            var legend = myPieChart.generateLegend();
+                            $("#fedpiechartlegend").html(legend);
+                        }
+
+
+                    }
+                }
+            });
+        }
         $('div[data-jagger-getmoreajax]').each(function (e) {
             var link = $(this).attr('data-jagger-getmoreajax');
             var targetresponseid = $(this).attr('data-jagger-response-msg');
@@ -193,51 +280,25 @@ var GINIT = {
 
             return false;
         });
-        $("a.bookentity").click(function () {
-            var link = $(this), url = link.attr("href");
-
-            $.ajax({
-                type: "GET",
-                url: url,
-                timeout: 2500,
-                cache: false,
-                success: function (data) {
-                    $("a.bookentity").show();
-                    $(this).hide();
-                    GINIT.initialize();
-                }
-            });
-            return false;
-        });
 
         $('button.modal-close').on('click', function (event) {
             $(this).foundation('reveal', 'close');
         });
 
         $('#providerlogtab').on('toggled', function (event, tab) {
-
-            var oko = tab.find("[data-reveal-ajax-tab]");
+            var oko = tab.find("[data-reveal-ajax-tab]").first();
             var link = oko.attr("data-reveal-ajax-tab");
             if (link !== undefined) {
-                //$('#providerlogtab').empty();
                 $.ajax({
                     cache: true,
                     type: 'GET',
                     url: link,
                     success: function (data) {
                         $('#providerlogtab').empty().append(data);
-                        $(document).foundation('reflow');
-                        $('.accordionButton').unbind();
-                        $('#editprovider').unbind();
-
-                        GINIT.initialize();
-
+                        $(document).foundation('accordion', 'reflow');
                     }
-
                 });
             }
-
-
         });
 
         $("button.cleartarget").on('click', function (e) {
@@ -310,7 +371,7 @@ var GINIT = {
                 },
                 error: function (xhr, status, error) {
                     var alertmsg = '' + error + '';
-                    alert(alertmsg);
+                    window.alert(alertmsg);
                     return false;
                 }
             });
@@ -671,7 +732,7 @@ var GINIT = {
                 },
                 error: function (jqXHR, textStatus, errorThrown) {
                     $('#spinner').hide();
-                    alert(jqXHR.responseText);
+                    window.alert(jqXHR.responseText);
                 }
             });
             return false;
@@ -706,8 +767,8 @@ var GINIT = {
                             fvform.find("button:focus").data("passed", "true");
                             fvform.find("button:focus").attr("disabled", "true");
                         } else if (data.returncode === "error") {
-                           fvform.find("button:focus").css("background-color", "#aa0000");
-                           fvform.find("button:focus").data("passed", "false");
+                            fvform.find("button:focus").css("background-color", "#aa0000");
+                            fvform.find("button:focus").data("passed", "false");
                         }
                         if (data.message) {
                             var msgdata;
@@ -730,15 +791,15 @@ var GINIT = {
                 error: function (x, t, m) {
                     $('#spinner').hide();
                     if (t === 'timeout') {
-                        alert('got timeout from validation server');
+                        window.alert('got timeout from validation server');
                     }
                     else {
-                        alert("unknown problem with receiving data");
+                        window.alert("unknown problem with receiving data");
                     }
                 }
             });
 
-            //return false; 
+            //return false;
         });
 
         $("form#approvequeue").submit(function (e) {
@@ -754,12 +815,13 @@ var GINIT = {
             });
 
             if (validators !== result) {
-                alert('All mandatory validations have to pass successfully!');
+                window.alert('All mandatory validations have to pass successfully!');
                 e.preventDefault();
             }
         });
 
-        $("a.fmembers").click(function () {
+
+        $(document).on('click', '.fmembers', 'a', function () {
 
             var link = $(this), url = link.attr("href");
             var row = $(this).parent().parent();
@@ -773,7 +835,7 @@ var GINIT = {
 
                 $.ajax({
                     url: url,
-                    timeout: 3500,
+                    timeout: 9500,
                     cache: true,
                     success: function (data) {
                         $('#spinner').hide();
@@ -782,7 +844,7 @@ var GINIT = {
                         var div_data;
                         $(row).addClass('opened').addClass('highlight');
                         if (!data) {
-                            alert('no data');
+                            window.alert('no data');
                         }
                         else {
                             if (!data.idp && !data.sp && !data.both) {
@@ -792,7 +854,7 @@ var GINIT = {
                             else {
                                 var preurl = data.definitions.preurl;
                                 if (data.idp) {
-                                    stitle = $('<div>' + data.definitions.idps + '</div>');
+                                    stitle = $('<div>' + data.definitions.idp + '</div>');
                                     nlist = $('<ol/>');
                                     $.each(data.idp, function (i, v) {
                                         div_data = '<li class="homeorg"><a href="' + preurl + v.pid + '">' + v.pname + '</a> (' + v.entityid + ') </li>';
@@ -802,7 +864,7 @@ var GINIT = {
                                     value.append(stitle);
                                 }
                                 if (data.sp) {
-                                    stitle = $('<div>' + data.definitions.sps + '</div>');
+                                    stitle = $('<div>' + data.definitions.sp + '</div>');
                                     nlist = $('<ol/>');
                                     $.each(data.sp, function (i, v) {
                                         div_data = '<li class="resource"><a href="' + preurl + v.pid + '">' + v.pname + '</a> (' + v.entityid + ') </li>';
@@ -831,7 +893,7 @@ var GINIT = {
                     },
                     error: function () {
                         $('#spinner').hide();
-                        alert('problem with loading data');
+                        window.alert('problem with loading data');
                     }
                 }).done(function () {
                         var nextrow = '<tr class="feddetails"><td colspan="7"><ul class="feddetails">' + value.html() + '</ul></td></tr>';
@@ -856,7 +918,7 @@ var GINIT = {
                     $('#spinner').hide();
                     var data = $.parseJSON(json);
                     if (!data) {
-                        alert('no data');
+                        window.alert('no data');
                     }
                     else {
                         var nlist = $('<div/>');
@@ -885,7 +947,7 @@ var GINIT = {
                 },
                 error: function () {
                     $('#spinner').hide();
-                    alert('problem with loading data');
+                    window.alert('problem with loading data');
                 }
 
             }).done(function () {
@@ -953,7 +1015,6 @@ $(document).ready(function () {
                 });
             });
         });
-
 
 
         $("button#idpssoadddomainhint").click(function () {
@@ -1083,6 +1144,7 @@ $(document).ready(function () {
             $("<div class=\"small-12 columns\"><div class=\"small-3 columns\"><label for=\"f[uii][spsso][desc][" + nf + "]\" class=\"right inline\">" + nfv + "</label></div><div class=\"small-6 large-7 columns\"><textarea id=\"f[uii][spsso][desc][" + nf + "]\" name=\"f[uii][spsso][desc][" + nf + "]\" rows=\"5\" cols=\"40\"/></textarea></div><div class=\"small-3 large-2 columns\"><button type=\"button\" class=\"btn langinputrm button tiny left inline alert\" name=\"uiispdescrm\" value=\"" + nf + "\">" + rmbtn + "</button></div></div>").insertBefore($(this).closest('span').parent());
         });
 
+
         $("button#addlname").click(function () {
             var selected = $("span.lnameadd option:selected").first();
             var nf = selected.val();
@@ -1097,6 +1159,54 @@ $(document).ready(function () {
             var row = createRowWithLangRm(nf, nfv, rowinputname, rmbtn);
             row.insertBefore($(this).closest('span').parent());
         });
+
+
+        var btnNewLang = $("button[name='addinnewlang']");
+        btnNewLang.on('click',function(e){
+            var el = $(this);
+            var group = el.closest('fieldset');
+
+            var langDropdown = el.closest('span');
+            if(langDropdown.length === 0)
+            {
+                console.log('sdfsdf');
+
+                return false;
+            }
+            var selected = langDropdown.find(':selected').first();
+            if(selected.length === 0)
+            {
+                console.log('selected length 0');
+                return false;
+            }
+            var isdisabled = selected.attr('disabled');
+            if(isdisabled !== null && isdisabled ==='disabled')
+            {
+                console.log('sdfsdf');
+
+                return false;
+            }
+            var langselected = selected.val();
+            var langselectedStr = selected.text();
+            if(typeof langselected === 'undefined' || langselected === '')
+            {
+                console.log('empty langselected');
+                return false;
+            }
+            var rmbtn = $("button#helperbutttonrm").html();
+            var inputname = el.attr('value').replace('XXX',langselected);
+            selected.attr('disabled', true).attr('selected', false);
+            var rowinputname = inputname;
+            var row = createRowWithLangRm(langselected, langselectedStr, rowinputname, rmbtn);
+            row.insertBefore($(this).closest('span').parent());
+
+
+
+
+        });
+
+
+
         $("button#idpadduiidesc").click(function () {
             var selected = $("span.idpuiidescadd option:selected").first();
             var nf = selected.val();
@@ -1477,6 +1587,7 @@ $(document).ready(function () {
                         formupdaterAction.find("select[name='policy']").prop('selected', false).filter('[value=""]').prop('selected', true);
                         formupdaterAction.find("input[name='attribute']").first().val(json.attributename);
                         formupdaterAction.find("input[name='requester']").first().val(json.requester);
+
                         mrequester.html(json.requester);
                         mattribute.html(json.attributename);
                         var tbody_data = $('<tbody></tbody>');
@@ -1512,6 +1623,11 @@ $(document).ready(function () {
                 if (json) {
                     var startTime = new Date();
                     var cl;
+                    var mlegend = '<div><span class="den">&nbsp;&nbsp;&nbsp;</span> <span>denied</span></div>' +
+                            '<div><span class="perm">&nbsp;&nbsp;&nbsp;</span> <span>permitted</span></div>'+
+                            '<div><span class="dis">&nbsp;&nbsp;&nbsp;</span> <span>not supported</span></div>'+
+                        '<div><span>R</span> <span>required</span></div>'+
+                        '<div><span>D</span> <span>desired</span></div>';
                     var attrdefs = json.attributes;
                     var policies = json.policies;
                     var countpolicies = json.total;
@@ -1523,7 +1639,7 @@ $(document).ready(function () {
                     }
                     var countAttr = 0;
                     var tbl = '<table class="table table-header-rotated" id="idpmatrixresult"><thead><tr>';
-                    tbl += '<th></th>';
+                    tbl += '<th style="background: white">'+mlegend+'</th>';
                     $.each(attrdefs, function (a, p) {
                         tbl += '<th class="rotate"><div><span>' + a + '</span></div></th>';
                         countAttr++;
@@ -1531,7 +1647,7 @@ $(document).ready(function () {
                     if (countAttr > 52) {
                         $("#container").css({"max-width": "100%"});
                     }
-                  
+
                     var cell, requiredAttr, pAttr;
                     tbl += '</tr></thead><tbody>';
                     $.each(policies, function (i, a) {
@@ -1545,11 +1661,10 @@ $(document).ready(function () {
                             else {
                                 pAttr = null;
                             }
-                            if(a['req'][k] !== undefined)
-                            {
-                              requiredAttr = a['req'][k];
+                            if (a['req'][k] !== undefined) {
+                                requiredAttr = a['req'][k];
                             }
-                            if (requiredAttr !== null ) {
+                            if (requiredAttr !== null) {
                                 cell = requiredAttr[0].toUpperCase();
                             }
                             else {
@@ -1620,10 +1735,11 @@ $(document).ready(function () {
     }
 
 
-    var fedloginurl = $('a#fedlogin').attr('href');
+    var fedlogin = $('#fedlogin').first();
+    var fedloginurl = fedlogin.attr('href');
     var browsertime = new Date();
     var browsertimezone = -browsertime.getTimezoneOffset();
-    $('a#fedlogin').attr('href', '' + fedloginurl + '/' + browsertimezone + '');
+    fedlogin.attr('href', '' + fedloginurl + '/' + browsertimezone + '');
 
     if ($('#fedcategories dd.active').length) {
         var url = $('dd.active').find('a').first().attr('href');
@@ -1639,7 +1755,7 @@ $(document).ready(function () {
                 $('#spinner').hide();
 
                 if (!data) {
-                    alert('no data in federation category');
+                    window.alert('no data in federation category');
                 }
                 else {
                     $("table.fedistpercat tbody tr").remove();
@@ -1648,7 +1764,7 @@ $(document).ready(function () {
                         value.append(tr_data);
                     });
                 }
-                GINIT.initialize();
+                //        GINIT.initialize();
             }
         });
     }
@@ -1665,12 +1781,12 @@ $(document).ready(function () {
             url: url,
             timeout: 2500,
             cache: true,
+            dataType: "json",
             value: value,
-            success: function (json) {
+            success: function (data) {
                 $('#spinner').hide();
-                data = $.parseJSON(json);
                 if (!data) {
-                    alert('no data in federation category');
+                    window.alert('no data in federation category');
                 }
                 else {
                     $("table.fedistpercat tbody tr").remove();
@@ -1679,14 +1795,14 @@ $(document).ready(function () {
                         value.append(tr_data);
                     });
                 }
-                GINIT.initialize();
+
             },
             beforeSend: function () {
                 $('#spinner').show();
             },
             error: function () {
                 $('#spinner').hide();
-                alert('problem with loading data');
+                window.alert('problem with loading data');
             }
         }).done(function () {
             var nextrow = value.html();
@@ -1756,7 +1872,7 @@ $(function () {
     }, 86000);
 
 
-    $('#languageset').on('change','select' ,function (e) {
+    $('#languageset').on('change', 'select', function (e) {
         var link = $("div#languageset form").attr('action');
         var url = link + this.value;
         $.ajax({
@@ -1766,9 +1882,9 @@ $(function () {
         }).done(function () {
             $('#languageset').foundation('reveal', 'close');
 
-            setTimeout(function(){
+            setTimeout(function () {
                 go_to_private_page();
-            },1000);
+            }, 1000);
 
         });
         return false;
@@ -1824,7 +1940,7 @@ $(function () {
             timeout: 2500,
             cache: false,
             success: function (data) {
-                alert(data);
+                window.alert(data);
             }
         });
         return false;
@@ -1841,10 +1957,10 @@ $(function () {
             success: function (json) {
                 data = $.parseJSON(json);
                 if (!data) {
-                    alert('no data');
+                    window.alert('no data');
                 }
                 else {
-                    alert(data.status);
+                    window.alert(data.status);
                 }
 
             }
@@ -1864,7 +1980,7 @@ $(function () {
                 $('#spinner').hide();
                 var data = $.parseJSON(json);
                 if (!data) {
-                    alert('no data');
+                    window.alert('no data');
                 }
                 else {
                     $("div#statisticdiag").replaceWith('<div id="statisticdiag"></div>');
@@ -1883,7 +1999,7 @@ $(function () {
             },
             error: function () {
                 $('#spinner').hide();
-                alert('problem with loading data');
+                window.alert('problem with loading data');
             }
 
         });
@@ -1902,25 +2018,34 @@ $(function () {
         return false;
     });
 
-    $("a.delbookentity").click(function () {
-        var link = $(this), url = link.attr("href");
 
+    $(".updatebookmark").on('click', function (e) {
+        e.preventDefault();
+        var link = $(this).attr("href");
+        var action = $(this).attr("data-jagger-bookmark");
+        var postsuccess = $(this).closest("[data-jagger-onsuccess]");
+        var postaction = postsuccess.attr('data-jagger-onsuccess');
+        if (link === undefined || action === undefined) {
+            return false;
+        }
         $.ajax({
-            url: url,
-            timeout: 2500,
-            cache: false,
-            success: $(this).parent().remove()
-        });
-        return false;
-    });
-    $("a.delbookfed").click(function () {
-        var link = $(this), url = link.attr("href");
+            url: link + '/' + action,
+            type: 'GET',
+            success: function (data) {
 
-        $.ajax({
-            url: url,
-            timeout: 2500,
-            cache: false,
-            success: $(this).parent().remove()
+                if (data && data === 'ok') {
+
+                    if (postaction !== undefined) {
+                        if (postaction === 'hide') {
+                            postsuccess.hide();
+                        }
+                    }
+                    else {
+                        window.alert('sdf');
+                    }
+                }
+
+            }
         });
         return false;
     });
@@ -1937,7 +2062,7 @@ $(function () {
                 $('#spinner').hide();
                 var data = $.parseJSON(json);
                 if (!data) {
-                    alert('no data');
+                    window.alert('no data');
                 }
                 else {
                     var nlist = $('<ul/>');
@@ -1954,7 +2079,7 @@ $(function () {
             },
             error: function () {
                 $('#spinner').hide();
-                alert('problem with loading data');
+                window.alert('problem with loading data');
             }
 
         }).done(function () {
@@ -2141,38 +2266,6 @@ $(function () {
     $(".userlist#details").tablesorter({sortList: [[3, 1], [0, 0]], widgets: ['zebra']});
     $("#options").tablesorter({sortList: [[0, 0]], headers: {3: {sorter: false}, 4: {sorter: false}}});
 
-    $("#formtabs").tabs({
-        cache: false,
-        activate: function (event, ui) {
-            GINIT.initialize();
-        }
-    });
-
-    $(".mytabs").tabs({
-        cache: false,
-        activate: function (event, ui) {
-            GINIT.initialize();
-        }
-    });
-
-
-    $("#fedtabs").tabs({
-        cache: true,
-        load: function (event, ui) {
-            $('.accordionButton').unbind();
-            GINIT.initialize();
-        }
-
-    });
-    $("#arptabs").tabs({
-        cache: true,
-        load: function (event, ui) {
-            $('.accordionButton').unbind();
-            $('.tablesorter').unbind();
-            GINIT.initialize();
-        }
-
-    });
     $("#logotabs").tabs({
         load: function (event, ui) {
             $('#availablelogos').unbind();
@@ -2217,28 +2310,22 @@ $("#nattrreqbtn").click(function (ev) {
     var newelement = '<fieldset><legend>' + attrname + '</legend><div class="small-12 columns"><div class="medium-3 columns medium-text-right"><select name="f[reqattr][' + rname + '][status]"><option value="required">required</option><option value="desired">desired</option></select><input type="hidden" name="f[reqattr][' + rname + '][attrname]" value="' + attrname + '"><input type="hidden" name="f[reqattr][' + rname + '][attrid]" value="' + attrid + '"></div><div class="medium-6 collumns end"><textarea name="f[reqattr][' + rname + '][reason]"></textarea></div></div></fieldset>';
     $(this).parent().parent().before(newelement);
 
-    GINIT.initialize();
-
 
 });
 
-$(document).on('click','a.pCookieAccept', function(e) {
-    e.preventDefault();
-    var link = $(this), url = link.attr("href");
-
+$(".pCookieAccept").on('click', function () {
+    var link = $(this).attr("href");
     $.ajax({
-        url: url,
-        timeout: 2500,
-        cache: false
+        url: link,
+        timeout: 2500
     });
     $('#cookiesinfo').hide();
-
     return false;
 });
 $("[id='f[entityid]']").change(function () {
     if ($(this).hasClass("alertonchange")) {
-        var entalert = $("div#entitychangealert").text();
-        alert(entalert);
+        var entalert = $("#entitychangealert").text();
+        window.alert(entalert);
     }
 });
 
@@ -2263,7 +2350,7 @@ $(document).ready(function () {
             }
         );
     }
-    $("button#vormversion").click(function () {
+    $("#vormversion").click(function () {
         $.ajax({
             cache: false,
             type: "GET",
@@ -2278,12 +2365,12 @@ $(document).ready(function () {
             },
             error: function () {
                 $('#spinner').hide();
-                alert('Error occurred');
+                window.alert('Error occurred');
             }
         });
         return false;
     });
-    $("button#vschema").click(function () {
+    $("#vschema").click(function () {
         $.ajax({
             cache: false,
             type: "GET",
@@ -2298,12 +2385,12 @@ $(document).ready(function () {
             },
             error: function () {
                 $('#spinner').hide();
-                alert('Error ocured');
+                window.alert('Error ocured');
             }
         });
         return false;
     });
-    $("button#vschemadb").click(function () {
+    $("#vschemadb").click(function () {
         $.ajax({
             cache: false,
             type: "GET",
@@ -2318,12 +2405,12 @@ $(document).ready(function () {
             },
             error: function () {
                 $('#spinner').hide();
-                alert('Error ocured');
+                window.alert('Error ocured');
             }
         });
         return false;
     });
-    $("button#vmigrate").click(function () {
+    $("#vmigrate").click(function () {
         $.ajax({
             cache: false,
             type: "GET",
@@ -2338,7 +2425,7 @@ $(document).ready(function () {
             },
             error: function () {
                 $('#spinner').hide();
-                alert('Error ocured');
+                window.alert('Error ocured');
             }
         });
         return false;
@@ -2362,7 +2449,7 @@ $(document).ready(function () {
                     }
                 },
                 error: function (jqXHR, textStatus, errorThrown) {
-                    alert('Error occured: ' + errorThrown);
+                    window.alert('Error occured: ' + errorThrown);
                 }
             });
 
@@ -2413,13 +2500,13 @@ $(document).ready(function () {
                     }
                 },
                 error: function (data) {
-                    alert('Error  ocurred');
+                    window.alert('Error  ocurred');
                 }
 
             });
         });
     });
-    $("#rmstatdef").on('click','button',function (ev) {
+    $("#rmstatdef").on('click', 'button', function (ev) {
         var url = $("form#rmstatdef").attr('action');
         var serializedData = $(this).serialize();
         sconfirm('', function (ev) {
@@ -2436,7 +2523,7 @@ $(document).ready(function () {
                         });
                     },
                     error: function (data) {
-                        alert('Error');
+                        window.alert('Error');
                     }
                 });
             }
@@ -2666,7 +2753,7 @@ $(".submit").click(function () {
     return false;
 });
 
-$('#joinfed').on('change','#fedid' ,function (e) {
+$('#joinfed').on('change', '#fedid', function (e) {
     $("div.validaronotice").hide();
     $("ul.validatorbuttons").replaceWith('<ul class="button-group validatorbuttons"></ul>');
     var csrfname = $("[name='csrfname']").val();
@@ -2743,7 +2830,7 @@ $("#showhelps").click(function (e) {
 $("div.section").parent().addClass("section");
 
 
-$("#notificationupdateform").on('submit',function (e) {
+$("#notificationupdateform").on('submit', function (e) {
 
     e.preventDefault();
     var serializedData = $(this).serializeArray();
@@ -2774,8 +2861,7 @@ $("#notificationupdateform").on('submit',function (e) {
 
                         subsriptionstatus.text(v.langstatus);
                     }
-                    if(foundrecord === false)
-                    {
+                    if (foundrecord === false) {
                         ctr.hide();
                     }
 
@@ -2786,7 +2872,7 @@ $("#notificationupdateform").on('submit',function (e) {
             $('#notificationupdatemodal').foundation('reveal', 'close');
         },
         error: function (jqXHR, textStatus, errorThrown) {
-            alert('Error occured: ' + errorThrown);
+            window.alert('Error occured: ' + errorThrown);
         }
 
 
@@ -2819,9 +2905,9 @@ $(document).on('submit', 'div#loginform form', function (e) {
             if (data) {
                 if (data.success === true && data.result === 'OK') {
                     $('#loginform').foundation('reveal', 'close');
-                    setTimeout(function(){
+                    setTimeout(function () {
                         go_to_private_page();
-                    },1000);
+                    }, 1000);
 
                 }
                 else if (data.result === 'secondfactor') {
@@ -2849,7 +2935,7 @@ $(document).on('submit', 'div#loginform form', function (e) {
 $("button.advancedmode").click(function () {
     var metadata = $("textarea#metadatabody").val();
     if (metadata.length === 0) {
-        alert("You did not inserted any metadata. You will have to fill in all the individual information manually.");
+        window.alert("You did not inserted any metadata. You will have to fill in all the individual information manually.");
     }
     var thisB = $(this);
     var postUrl = thisB.val();
@@ -2902,7 +2988,7 @@ $(".afilter").click(function () {
                 var theadtr = $('<tr/>');
                 thead.append(theadtr);
 
-                var Columns =[];
+                var Columns = [];
                 var tmpcolumns = result.columns;
                 var colstatus;
                 var counter = 0;
@@ -2953,7 +3039,7 @@ $(".afilter").click(function () {
                         counter++;
                         tbodyToInsert[a++] = '</tr>';
 
-                    } //end filter condtion 
+                    } //end filter condtion
                 });
                 tbody.append(tbodyToInsert.join(''));
                 var endTime = new Date();
@@ -3002,7 +3088,7 @@ $('button[name="mrolebtn"]').click(function (e) {
         cache: false,
         dataType: "json",
         success: function (json) {
-            var rarray =[];
+            var rarray = [];
             $.each(json, function (ig, vg) {
                 rarray.push(vg);
 
@@ -3128,9 +3214,9 @@ $(document).on('submit', "#duo_form", function (e) {
                 if (data.success === true && data.result === 'OK') {
                     $('#loginform').foundation('reveal', 'close');
 
-                    setTimeout(function(){
+                    setTimeout(function () {
                         go_to_private_page();
-                    },1000);
+                    }, 1000);
 
                 }
                 else if (data.result === 'secondfactor') {
@@ -3174,22 +3260,20 @@ $("#updateprefsmodal").on('submit', function (e) {
         success: function (data) {
             if (data) {
                 if (data.result === 'OK') {
-                    var sRecord = $(document).find('[data-jagger-record="'+data.confname+'"]').first();
+                    var sRecord = $(document).find('[data-jagger-record="' + data.confname + '"]').first();
 
 
                     var rowRecord = sRecord.closest('tr');
                     var type = data.type;
-                    if(type === 'text') {
+                    if (type === 'text') {
 
                         rowRecord.find('span[data-jagger-name="vtext"]').first().html(data.vtext);
                     }
                     var sStatus = rowRecord.find('span[data-jagger-name="status"]').first();
-                    if(data.status)
-                    {
+                    if (data.status) {
                         sStatus.removeClass('alert').html(data.statusstring);
                     }
-                    else
-                    {
+                    else {
                         sStatus.addClass('alert').html(data.statusstring);
                     }
 
@@ -3227,7 +3311,7 @@ $(document).on('click', 'a.updateprefs', function (e) {
 
 
     if (eText === null) {
-        alert("d");
+        window.alert("d");
     }
     $.ajax({
         'url': geturl,
